@@ -28,20 +28,23 @@
 	},
 	// Discord Gatewayへの常時接続を持つDurable Objectと、/importの進み具合を見張るDurable Object、
 	// エージェントのチャンネルごとに、Managed Agentsのセッションとのやり取りを受け持つDurable Object、
-	// 知識チャンネルのPowerPointをPDFにするコンテナ(下のcontainers)を動かすDurable Object
+	// 知識チャンネルのPowerPointをPDFにするコンテナ(下のcontainers)を動かすDurable Object、
+	// 利用者ごとに、会話を要約した動画を作るセッションを見回るDurable Object
 	"durable_objects": {
 		"bindings": [
 			{ "name": "GATEWAY", "class_name": "Gateway" },
 			{ "name": "IMPORT_PROGRESS", "class_name": "ImportProgress" },
 			{ "name": "AGENT_SESSION", "class_name": "AgentSession" },
-			{ "name": "KNOWLEDGE_CONVERTER", "class_name": "KnowledgeConverter" }
+			{ "name": "KNOWLEDGE_CONVERTER", "class_name": "KnowledgeConverter" },
+			{ "name": "VIDEO_JOB", "class_name": "VideoJob" }
 		]
 	},
 	"migrations": [
 		{ "tag": "v1", "new_sqlite_classes": ["Gateway"] },
 		{ "tag": "v2", "new_sqlite_classes": ["ImportProgress"] },
 		{ "tag": "v3", "new_sqlite_classes": ["AgentSession"] },
-		{ "tag": "v4", "new_sqlite_classes": ["KnowledgeConverter"] }
+		{ "tag": "v4", "new_sqlite_classes": ["KnowledgeConverter"] },
+		{ "tag": "v5", "new_sqlite_classes": ["VideoJob"] }
 	],
 	// 知識チャンネルのPowerPointをPDFにするコンテナ(Gotenberg。LibreOfficeでOfficeのファイルをPDFにするHTTPのサーバー)。
 	// 外には公開せず、Workerからだけ呼ぶ。Docker Hubのイメージを、版を固定して使う(デプロイにDockerは要らない)。
@@ -126,14 +129,16 @@
 					{ "name": "GATEWAY", "class_name": "Gateway" },
 					{ "name": "IMPORT_PROGRESS", "class_name": "ImportProgress" },
 					{ "name": "AGENT_SESSION", "class_name": "AgentSession" },
-					{ "name": "KNOWLEDGE_CONVERTER", "class_name": "KnowledgeConverter" }
+					{ "name": "KNOWLEDGE_CONVERTER", "class_name": "KnowledgeConverter" },
+					{ "name": "VIDEO_JOB", "class_name": "VideoJob" }
 				]
 			},
 			"migrations": [
 				{ "tag": "v1", "new_sqlite_classes": ["Gateway"] },
 				{ "tag": "v2", "new_sqlite_classes": ["ImportProgress"] },
 				{ "tag": "v3", "new_sqlite_classes": ["AgentSession"] },
-				{ "tag": "v4", "new_sqlite_classes": ["KnowledgeConverter"] }
+				{ "tag": "v4", "new_sqlite_classes": ["KnowledgeConverter"] },
+				{ "tag": "v5", "new_sqlite_classes": ["VideoJob"] }
 			],
 			"containers": [
 				{

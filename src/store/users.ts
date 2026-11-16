@@ -18,6 +18,8 @@ export interface UserSettings {
 	customPrompt: string | null;
 	featWebSearch: boolean;
 	featUsageDisplay: boolean;
+	/** 会話を要約した動画を作る道具を、AIに渡すか(仕様: docs/spec/behavior.md「動画の作成」) */
+	featVideo: boolean;
 }
 
 /** まだ設定を変えていない人の設定 */
@@ -28,6 +30,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
 	customPrompt: null,
 	featWebSearch: false,
 	featUsageDisplay: false,
+	featVideo: false,
 };
 
 /**
@@ -41,6 +44,7 @@ interface UserRow {
 	custom_prompt: string | null;
 	feat_web_search: number;
 	feat_usage_display: number;
+	feat_video: number;
 }
 
 export async function getUserSettings(
@@ -50,7 +54,7 @@ export async function getUserSettings(
 	const row = await db
 		.prepare(
 			`SELECT model_key, custom_model_id, effort, custom_prompt,
-				feat_web_search, feat_usage_display
+				feat_web_search, feat_usage_display, feat_video
 			FROM users WHERE user_id = ?`,
 		)
 		.bind(userId)
@@ -65,6 +69,7 @@ export async function getUserSettings(
 		customPrompt: row.custom_prompt,
 		featWebSearch: row.feat_web_search === 1,
 		featUsageDisplay: row.feat_usage_display === 1,
+		featVideo: row.feat_video === 1,
 	};
 }
 
@@ -76,6 +81,7 @@ const SETTING_COLUMNS = {
 	customPrompt: "custom_prompt",
 	featWebSearch: "feat_web_search",
 	featUsageDisplay: "feat_usage_display",
+	featVideo: "feat_video",
 } as const satisfies Record<keyof UserSettings, string>;
 
 /** 設定を保存する。渡した項目だけを変える。usersの行がなければ作り、ほかの項目は既定のままにする */

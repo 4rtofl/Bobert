@@ -11,10 +11,12 @@ import {
 } from "../discord/constants";
 import { logEvent } from "../log";
 import {
+	getRegisteredProviders,
 	getUserSettings,
 	type UserSettings,
 	updateUserSettings,
 } from "../store/users";
+import { VIDEO_FEATURE_LABEL, VIDEO_KEY_MISSING } from "../video/texts";
 
 /** /feat のボタンのIDの頭 */
 export const FEAT_BUTTON_PREFIX = "feat:";
@@ -31,10 +33,19 @@ const FEATURES = [
 		customId: `${FEAT_BUTTON_PREFIX}usage_display`,
 		label: "利用量の表示",
 	},
+	{
+		setting: "featVideo",
+		customId: `${FEAT_BUTTON_PREFIX}video`,
+		label: VIDEO_FEATURE_LABEL,
+		// 動画は本人のAnthropicのアカウントで作るので、キーがなければONにできない
+		needsAnthropicKey: VIDEO_KEY_MISSING,
+	},
 ] as const satisfies readonly {
 	setting: keyof UserSettings;
 	customId: string;
 	label: string;
+	/** ONにするのにAnthropicのキーが要る機能なら、キーがない人に見せる案内 */
+	needsAnthropicKey?: string;
 }[];
 
 /** /feat: 機能ごとのON/OFFのボタンを、本人にだけ見せる */
@@ -61,6 +72,20 @@ export async function toggleFeature(
 	}
 	const settings = await getUserSettings(env.DB, userId);
 	const enabled = !settings[feature.setting];
+	if (
+		enabled &&
+		"needsAnthropicKey" in feature &&
+		!(await getRegisteredProviders(env.DB, userId)).has("anthropic")
+	) {
+		logEvent("interactions", "feature_key_missing", {
+			userId,
+			feature: feature.setting,
+		});
+		return {
+			type: InteractionResponseType.UpdateMessage,
+			data: featMessage(settings, feature.needsAnthropicKey),
+		};
+	}
 	await updateUserSettings(env.DB, userId, { [feature.setting]: enabled });
 	logEvent("interactions", "feature_toggled", {
 		userId,
@@ -73,13 +98,16 @@ export async function toggleFeature(
 	};
 }
 
-/** ボタンを並べたメッセージ。ONは緑、OFFは灰色のボタンにする */
-function featMessage(settings: UserSettings): {
+/** ボタンを並べたメッセージ。ONは緑、OFFは灰色のボタンにする。noticeを渡すと、ボタンの上の文を置き換える */
+function featMessage(
+	settings: UserSettings,
+	notice = "使う機能を、ボタンで切り替えてください。",
+): {
 	content: string;
 	components: APIActionRowComponent<APIComponentInMessageActionRow>[];
 } {
 	return {
-		content: "使う機能を、ボタンで切り替えてください。",
+		content: notice,
 		components: [
 			{
 				type: ComponentType.ActionRow,

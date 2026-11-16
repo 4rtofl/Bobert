@@ -175,6 +175,9 @@ importers:
       discord-api-types:
         specifier: ^0.38.57
         version: 0.38.57
+      dopagakix:
+        specifier: github:4rtoflow/Dopagakix#424b69f14f72a084ac735827a4758cda312fb9ef
+        version: https://codeload.github.com/4rtoflow/Dopagakix/tar.gz/424b69f14f72a084ac735827a4758cda312fb9ef
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.6.2
@@ -489,6 +492,15 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource-variable/jetbrains-mono@5.3.0':
+    resolution: {integrity: sha512-F32xpS2NsGYoQi2ADSkKTgpJj7ozajsGgDJ8woTnqjmIB+dxDIqImjl4pXZVEExu8UFZ2ndhmX18EBS/hdz3Lw==}
+
+  '@fontsource-variable/noto-serif-jp@5.3.1':
+    resolution: {integrity: sha512-quU5uIezSqZFgPaDDI2C3hQfIJHzyXVYuvMZsDDF++og8yechsAwcmCkLLdofPboUB1xHOWV3xohJyIVBi3b4g==}
+
+  '@fontsource/zen-kaku-gothic-new@5.3.1':
+    resolution: {integrity: sha512-L69mE6bkzeVK3UdTenxOmCIWvTwMxohJRNm1dAj+W+UiCULQ91b7M77ENVw+pjGmFL6zKPFYFeH3g8x2ugAJNw==}
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -947,6 +959,10 @@ packages:
   cjs-module-lexer@1.2.3:
     resolution: {integrity: sha512-0TNiGstbQmCFwt4akjjBg5pLRTSyj/PkWQ1ZoO2zntmg9yLqSRxwEa4iCfQLGjqhiqBfOJa7W/E8wfGrTDmlZQ==}
 
+  commander@15.1.0:
+    resolution: {integrity: sha512-cgnQ88TRrWcC7pVq46RzJVRMktu3W2RcbnoidnfBsl1bmDCBwJS/udcIZpKoCrbAYYaCqsz1yZCVIgbIaU3ddQ==}
+    engines: {node: '>=22.12.0'}
+
   cookie@1.1.1:
     resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
     engines: {node: '>=18'}
@@ -957,6 +973,12 @@ packages:
 
   discord-api-types@0.38.57:
     resolution: {integrity: sha512-R1CTSSt4RshqCq23j2Xq2ZscvzB4LzG9OB1CYQdKUGdw8Ti/oF/72EEtK2mNpagG/Vj9NcBT7dw9lKLf+Dacfg==}
+
+  dopagakix@https://codeload.github.com/4rtoflow/Dopagakix/tar.gz/424b69f14f72a084ac735827a4758cda312fb9ef:
+    resolution: {gitHosted: true, integrity: sha512-6PLA9G0A175ybrXwA/dP3wkLAxeHGoR22XU1LNaRsIBV5LDCDS/yPnUqYkhbZL69OHMgxXTuDwVxKM2zY5KWjA==, tarball: https://codeload.github.com/4rtoflow/Dopagakix/tar.gz/424b69f14f72a084ac735827a4758cda312fb9ef}
+    version: 0.1.0
+    engines: {node: '>=22'}
+    hasBin: true
 
   error-stack-parser-es@1.0.5:
     resolution: {integrity: sha512-5qucVt2XcuGMcEGgWI7i+yZpmpByQ8J1lHhcL7PwqCwu9FPP3VUXzT4ltHe5i2z9dePwEHcDVOAfSnHsOlCXRA==}
@@ -1103,6 +1125,11 @@ packages:
   picomatch@4.0.7:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
+
+  playwright-core@1.65.1:
+    resolution: {integrity: sha512-hqPpz7blSMPxWVdoeE1yiBSzXsKiVOd2k+kjCvmUywD2GPO2Dd9HfcWnq9NN0GHbNZDFgZ9JfBFr+X5/BLo0qw==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   postcss@8.5.31:
     resolution: {integrity: sha512-YUbWYCgErwnMAVkjUnYa+KlMBzGpHwiIt/DE7f0G33AuX2LH9UcTk6KgWxd3zRU+pN3u/C+Xl3EnMLM4Hea7Sg==}
@@ -1477,6 +1504,12 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
+  '@fontsource-variable/jetbrains-mono@5.3.0': {}
+
+  '@fontsource-variable/noto-serif-jp@5.3.1': {}
+
+  '@fontsource/zen-kaku-gothic-new@5.3.1': {}
+
   '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.35.5':
@@ -1754,11 +1787,22 @@ snapshots:
 
   cjs-module-lexer@1.2.3: {}
 
+  commander@15.1.0: {}
+
   cookie@1.1.1: {}
 
   detect-libc@2.1.2: {}
 
   discord-api-types@0.38.57: {}
+
+  dopagakix@https://codeload.github.com/4rtoflow/Dopagakix/tar.gz/424b69f14f72a084ac735827a4758cda312fb9ef:
+    dependencies:
+      '@fontsource-variable/jetbrains-mono': 5.3.0
+      '@fontsource-variable/noto-serif-jp': 5.3.1
+      '@fontsource/zen-kaku-gothic-new': 5.3.1
+      commander: 15.1.0
+      playwright-core: 1.65.1
+      zod: 4.6.5
 
   error-stack-parser-es@1.0.5: {}
 
@@ -1892,6 +1936,8 @@ snapshots:
   picocolors@1.1.1: {}
 
   picomatch@4.0.7: {}
+
+  playwright-core@1.65.1: {}
 
   postcss@8.5.31:
     dependencies:
