@@ -739,6 +739,45 @@ AIが、どんなスレッドがあるかを知り、スレッドと親のチャ
   - **連携を外す:** `/delete`で、連携の記録を消し、GitHubへの承認も取り消す。GitHubだけを外したいときは、GitHubの設定画面でBobertのアプリを外す。外されたことには、次に使うときにBobertが気づく。
 - **片付け:** セッションを終えたとき、チャンネルが消されたとき、Bobertがサーバーから外されたとき(`GUILD_DELETE`)、`/delete`のときに、セッションを消す。動いている間は消せないので、止めてから消す。
 
+## 動画の作成
+
+会話を要約した縦型の動画を、[Dopagakix](https://github.com/4rtoflow/Dopagakix)で作る。DopagakixにはNode.js、Chromium、ffmpeg、VOICEVOX ENGINEが要り、Workersでは動かせないので、頼んだ本人のAnthropicのアカウントで動くManaged Agentsのサンドボックスで作る。決めた経緯は[issue #118](https://github.com/4rtoflow/Bobert/issues/118)とDopagakixの[issue #21](https://github.com/4rtoflow/Dopagakix/issues/21)を参照。画面と文言は[Botの振る舞い](behavior.md)の「動画の作成」、費用は[LLM利用コスト](llm-cost.md)の「動画の作成の費用」を参照。
+
+```
+メンションで「これを動画にして」と頼む
+│
+├ 返答の処理(Workers。AIの費用は今までどおり本人か寄付)
+│  1. AIが prepare_video を呼ぶ → 対象のあたりの発言と、台本の書き方を返す。
+│     足りなければ、AIが more を付けて呼び、もっと前の発言を読む
+│  2. AIが台本(JSON)を書いて create_video を呼ぶ → Bobertが台本を確かめる。問題があればAIに返して直させる
+│  3. 動画の仕事(VideoJob)を始め、AIが「作り始めた」と返答する
+│
+└ 動画の仕事(Durable Object。ここからは本人のAnthropicのキーを使う)
+   4. 動画用のエージェントの設定と環境がなければ、本人のアカウントに作る
+   5. 台本のファイルを上げてサンドボックスに置き、セッションを作って、手順を送る
+   6. サンドボックスの中で、Dopagakixを入れ、VOICEVOX ENGINEを起動し、check → 読みの直し → render
+   7. 30秒ごとのアラームで様子を見て、動画ができたら取り出し、頼んだメッセージへの返信として投稿する
+   8. セッションと、上げたファイル、出したファイルを消す
+```
+
+- **道具(`src/video/tools.ts`):** `/feat`で「動画の作成」をONにし、Anthropicのキーを登録した人の返答にだけ渡す。メンションや返信への返答だけで渡し、「Bobertに聞く」などでは渡さない。
+  - `prepare_video`は、今いるチャンネルの履歴を、時系列で読む道具と同じ読み方(`readChannelTimeline`)で読む。最初は対象より前の40件(返信先が対象なら、その後の10件も)、続きは50件ずつ。頼んだメッセージそのものは入れない。渡した発言は、その返答の間だけ覚えておき、数値を数え、引用を確かめるのに使う。
+  - `create_video`は、Dopagakixが出す型と確かめる処理(`dopagakix/conversation`。Workersで動くようにzodだけに頼る)で台本を確かめる。形の誤りと、引用が読んだ発言の本文にないことは、直すまで作らない。Dopagakixの警告(文字数や口調など)は、2回まで返して直させ、3回目は警告が残っていても作る(描画はできるため)。
+  - 画面に出す数値(参加者の数、発言の数、最初と最後の発言の日時、チャンネルの名前)は、Bobertが数え、台本と一緒にDopagakixの会話用のファイル(`kind: "conversation"`)にする。
+- **Dopagakixの版:** Bobertは、Dopagakixをgitの依存(コミットを固定)として入れ、型と確かめる処理だけを使う。サンドボックスには、いつもDopagakixのmainを入れる。この2つがずれても動くよう、Dopagakixは、会話用の台本の型と、`check`・`render`のコマンドと出力の形を、壊す形で変えない決まりにしている(DopagakixのREADME「互換性の決まり」)。
+- **1人1本まで:** D1(`video_jobs`)に、作っている途中の動画を記録する。行があれば、次は断る。行が時間切れの2倍(30分)より古ければ、残ってしまったものとみなして置き換える。
+- **動画の仕事(`VideoJob`、`src/video/job-object.ts`):** 利用者ごとのDurable Object。台本のファイル、話者、セッションのIDを持ち、アラームで動く。
+  - 返答を待たせないよう、セッションを始めるのもアラームで行う。始めたら、30秒ごとにセッションの状態を見る。デプロイなどで止まっても、保存したセッションのIDで、次のアラームから続ける。
+  - セッションが止まった(`session.status_idle`)かは、イベントの一覧で、手順を送った後に止まったかで決める。作ったばかりのセッションは、手順を受け取る前に止まった状態になっていることがあるため。
+  - 動画は、セッションのファイルの一覧(`scope_id`で絞る)から、取り出せる(`downloadable`)mp4を探す。なければ、エージェントの報告に、Dopagakixの「動画の大きさが X.XMB あり…」があれば大きすぎ、`billing_error`があれば残高不足、どれでもなければ失敗として知らせる。
+  - 頼まれてから15分たったら、セッションを止めて消し、時間切れを知らせる。
+- **動画用のエージェント(`src/video/sandbox.ts`):** Bobert Agentとは別に、本人のアカウントに設定と環境を作り、IDをD1(`video_users`)に記録する。記録したものが見つからなければ作り直す。
+  - モデルはClaude Haiku 5.5、思考の深さは`low`。決まったコマンドを実行させるだけなので。指示と道具は、セッションを始めるときに渡す(`agent_with_overrides`)。
+  - 道具は`bash`、`read`、`edit`だけを許す(`edit`は、台本の読みの指定を直すため)。どれも確認なしで実行する(`always_allow`)。
+  - ネットワークは`limited`にし、パッケージの取得(`allow_package_managers`)だけを通す。これで、npmと、DopagakixとVOICEVOX ENGINEの取得に要るGitHubのホストに届く。
+  - 台本は、ファイルとしてサンドボックスの`/mnt/session/uploads/video/conversation.json`に置き、AIへの指示には入れない。会話の中の文が、AIへの指示として働かないようにするため。
+- **`/delete`:** 作っている途中の動画のセッションを消し(`VideoJob`の`purge`)、動画用の環境を消して、エージェントの設定をアーカイブする。
+
 ## Discordの権限
 
 - 特権インテント「Message Content」を必須とする(決定事項を参照)。Botが見えるチャンネルの全メッセージの本文が、Botに届く。

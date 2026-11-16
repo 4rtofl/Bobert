@@ -52,6 +52,12 @@ describe("/feat", () => {
 				style: ButtonStyle.Secondary,
 				label: "利用量の表示: OFF",
 			},
+			{
+				type: ComponentType.Button,
+				custom_id: "feat:video",
+				style: ButtonStyle.Secondary,
+				label: "動画の作成: OFF",
+			},
 		]);
 	});
 
@@ -76,9 +82,36 @@ describe("/feat", () => {
 			second.data.components[0].components.map(
 				(button: { label: string }) => button.label,
 			),
-		).toEqual(["Web検索: ON", "利用量の表示: ON"]);
+		).toEqual(["Web検索: ON", "利用量の表示: ON", "動画の作成: OFF"]);
 		const settings = await getUserSettings(env.DB, user.id);
 		expect(settings.featUsageDisplay).toBe(true);
 		expect(settings.featWebSearch).toBe(true);
+	});
+
+	it("動画の作成は、Anthropicのキーがなければ、ONにせずに登録を案内する", async () => {
+		const user = await userWith("openrouter");
+
+		const body = await sendInteraction(press(user, "feat:video"));
+
+		expect(body.type).toBe(InteractionResponseType.UpdateMessage);
+		expect(body.data.content).toBe(
+			"動画の作成を使うには、AnthropicのAPIキーの登録が必要です(OpenRouterでは使えません)。`/setup` から登録してください。",
+		);
+		expect(body.data.components[0].components[2]).toMatchObject({
+			label: "動画の作成: OFF",
+		});
+		expect((await getUserSettings(env.DB, user.id)).featVideo).toBe(false);
+	});
+
+	it("Anthropicのキーがあれば、動画の作成をONにできる", async () => {
+		const user = await userWith("anthropic");
+
+		const on = await sendInteraction(press(user, "feat:video"));
+
+		expect(on.data.components[0].components[2]).toMatchObject({
+			style: ButtonStyle.Success,
+			label: "動画の作成: ON",
+		});
+		expect((await getUserSettings(env.DB, user.id)).featVideo).toBe(true);
 	});
 });

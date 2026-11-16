@@ -19,6 +19,7 @@ export { AgentSession } from "./agent/session-object";
 export { Gateway } from "./gateway/gateway";
 export { ImportProgress } from "./import/progress-object";
 export { KnowledgeConverter } from "./knowledge/converter";
+export { VideoJob } from "./video/job-object";
 
 export default {
 	async fetch(request, env, ctx): Promise<Response> {

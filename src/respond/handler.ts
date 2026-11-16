@@ -43,9 +43,16 @@ import {
 } from "../store/summaries";
 import {
 	type Credential,
+	getRegisteredProviders,
 	getUserSettings,
 	type UserSettings,
 } from "../store/users";
+import { videoJobStub } from "../video/store";
+import {
+	createVideoTool,
+	newVideoMaterial,
+	prepareVideoTool,
+} from "../video/tools";
 import { voiceReaderFor } from "../voice/reader";
 import { heardNote } from "../voice/texts";
 import { FileCatalog, type FileSupport } from "./attachments";
@@ -423,6 +430,7 @@ async function composeAnswer(
 		summaryUsages,
 		parentDeleted,
 		heardFrom: trigger.messageId,
+		videoTrigger: trigger,
 	});
 }
 
@@ -445,6 +453,12 @@ export async function answer(
 		 * 音声メッセージでなければ、添えない(仕様: docs/spec/behavior.md「音声メッセージ」)
 		 */
 		heardFrom?: string;
+		/**
+		 * 動画を頼めるメッセージ(メンションや返信で話しかけたメッセージ)。「Bobertに聞く」などでは渡さない。
+		 * /feat で「動画の作成」をONにし、Anthropicのキーを登録した人にだけ、動画の道具を渡す
+		 * (仕様: docs/spec/behavior.md「動画の作成」)
+		 */
+		videoTrigger?: StoredMessageInput;
 	},
 ): Promise<ComposedReply> {
 	const { userId, settings, model } = context;
@@ -539,6 +553,19 @@ export async function answer(
 					memoryTool,
 				)
 			: null;
+	// 動画の道具。動画は本人のAnthropicのアカウントで作るので、寄付で答えるときも、本人のキーが要る
+	const videoTrigger = conversation.videoTrigger;
+	const video =
+		files !== undefined &&
+		guildId !== null &&
+		videoTrigger !== undefined &&
+		settings.featVideo &&
+		(await getRegisteredProviders(env.DB, userId)).has("anthropic")
+			? {
+					requester: { userId, guildId, trigger: videoTrigger },
+					material: newVideoMaterial(),
+				}
+			: null;
 	const tools = files
 		? [
 				channelHistoryTool(history, botUserId, files),
@@ -586,6 +613,22 @@ export async function answer(
 				...(summary === null && startsWithReply(root)
 					? [replyChainTool(root, history, botUserId, files)]
 					: []),
+				...(video !== null
+					? [
+							prepareVideoTool(
+								history,
+								botUserId,
+								video.requester,
+								video.material,
+							),
+							createVideoTool(
+								env.DB,
+								video.requester,
+								video.material,
+								(request) => videoJobStub(env, request.userId).start(request),
+							),
+						]
+					: []),
 			]
 		: [];
 	const result = await context.callModel({
@@ -628,6 +671,14 @@ export async function answer(
 		knowledgeSearches: knowledgeReads.searches,
 		// 会話の音声メッセージの数(文字にした内容は残さない)
 		voiceMessages: voiceTexts.size,
+		// 動画の道具を渡したか、読んだ発言の数、作り始めたか(中身は残さない)
+		video:
+			video === null
+				? null
+				: {
+						messages: video.material.messages.size,
+						started: video.material.started,
+					},
 		...result.usage,
 	});
 	// 料金が上がる境目を超えたら(1回の呼び出しごとの入力で見る)、その会話・その人・そのモデルで1回だけ、要約を勧める
