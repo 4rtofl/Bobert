@@ -109,6 +109,26 @@ function script(quoteText = "テストが終わってから決めよう", by = "
 	};
 }
 
+/** script() を、です・ます調の読み上げ文にした台本(ずんだもん以外の話者に使う) */
+function politeScript(quoteText?: string, by?: string) {
+	const base = script(quoteText, by);
+	const polite = (lines: string[]) =>
+		lines.map((line) =>
+			line
+				.replace(/(?:なの|の)だ。$/, "です。")
+				.replace(/したです。$/, "しました。"),
+		);
+	return {
+		...base,
+		opening: { narration: polite(base.opening.narration) },
+		scenes: base.scenes.map((scene) => ({
+			...scene,
+			narration: polite(scene.narration),
+		})),
+		closing: { narration: polite(base.closing.narration) },
+	};
+}
+
 /** 動画の仕事を始めた記録 */
 function recordingStarter(result = true) {
 	const started: VideoJobRequest[] = [];
@@ -147,6 +167,10 @@ describe("prepare_video", () => {
 		expect(result).not.toContain("これを動画にして");
 		expect(result).toContain("これより前の発言はありません。");
 		expect(result).toContain("## 動画の台本の書き方");
+		// 話者の口調は読み上げ文だけ。返答には使わせない
+		expect(result).toContain(
+			"利用者への返答は、話者の口調ではなく、いつもの口調で書きます。",
+		);
 		expect([...material.messages.keys()]).toEqual(
 			CONVERSATION.map((message) => message.id),
 		);
@@ -442,9 +466,16 @@ describe("create_video", () => {
 			() => 1_000,
 		);
 
-		const result = await tool.run({ script: script(), speaker: "四国めたん" });
+		const result = await tool.run({
+			script: politeScript(),
+			speaker: "四国めたん",
+		});
 
 		expect(result).toContain("動画を作り始めました。");
+		// 返答には、読み上げ文の口調を使わせない
+		expect(result).toContain(
+			"返答は、台本の読み上げ文の口調ではなく、いつもの口調で書いてください。",
+		);
 		const request = starter.started[0];
 		expect(request).toMatchObject({
 			userId: "3005",
@@ -490,6 +521,24 @@ describe("create_video", () => {
 
 		expect(result).toContain("いま別に作っています");
 		expect(starter.started).toEqual([]);
+	});
+
+	it("ずんだもん以外の話者で、読み上げ文が「〜のだ」口調なら、です・ます調に直させる", async () => {
+		const { material, requester } = await prepared("3008");
+		const starter = recordingStarter();
+		const tool = createVideoTool(env.DB, requester, material, starter.start);
+
+		const result = await tool.run({ script: script(), speaker: "四国めたん" });
+
+		expect(result).toContain("台本に直したほうがよい点があります。");
+		expect(result).toContain("opening.narration[0]");
+		expect(result).toContain("です・ます調");
+		expect(starter.started).toEqual([]);
+
+		expect(
+			await tool.run({ script: politeScript(), speaker: "四国めたん" }),
+		).toContain("動画を作り始めました。");
+		expect(starter.started).toHaveLength(1);
 	});
 
 	it("選べない話者は断る", async () => {

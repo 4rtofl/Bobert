@@ -1,4 +1,5 @@
 import {
+	BUILTIN_PERSONAS,
 	CONVERSATION_VERSION,
 	type ConversationFile,
 	type ConversationScript,
@@ -6,6 +7,7 @@ import {
 	conversationScriptJsonSchema,
 	DEFAULT_CONVERSATION_SECONDS,
 	narrationBudget,
+	type Persona,
 	parseConversationFile,
 	parseConversationScript,
 } from "dopagakix/conversation";
@@ -34,6 +36,7 @@ import {
 	findSpeaker,
 	personaOf,
 	VIDEO_SPEAKERS,
+	type VideoSpeaker,
 } from "./speakers";
 import { claimVideoJob, deleteVideoJob } from "./store";
 
@@ -326,7 +329,8 @@ function scriptGuide(): string {
 		"- quote の text には、読んだ発言の本文の一部を、一字一句そのまま書きます。言い換えた文と、リンク先のページの文は使いません。by を書くときは、その発言をした人の名前を、読んだ発言に出ているとおりに書きます。",
 		"- 会話(発言と、リンク先のページ)にないことは書きません。政治や宗教の宣伝になる動画や、事実と違う内容、誤解を招く内容の動画は作りません。",
 		"- 参加者の数、発言の数、期間は、Bobertが読んだ発言から数えて画面に出すので、台本には書きません。動画には「AIによる要約」と表示されます。",
-		`- 話者(speaker)は、利用者が指示したときだけ変えます。既定は${DEFAULT_SPEAKER.name}です。読み上げ文は、${DEFAULT_SPEAKER.name}なら「〜のだ」口調、ほかの話者なら、です・ます調で書きます。`,
+		`- 話者(speaker)は、利用者が指示したときだけ変えます。既定は${DEFAULT_SPEAKER.name}です。読み上げ文(narration)は、話者に合わせて、${DEFAULT_SPEAKER.name}なら「〜のだ」口調、ほかの話者なら、です・ます調で書きます。`,
+		"- 話者の口調は、読み上げ文だけに使います。画面の文字は中立に書きます。利用者への返答は、話者の口調ではなく、いつもの口調で書きます。",
 	].join("\n");
 }
 
@@ -387,6 +391,7 @@ export function createVideoTool(
 				script,
 				persona === null ? {} : { persona },
 			);
+			check.issues.push(...otherPersonaIssues(script, speaker, persona));
 			if (
 				check.issues.length > 0 &&
 				material.warningRounds < MAX_WARNING_ROUNDS
@@ -436,9 +441,53 @@ export function createVideoTool(
 				scenes: script.scenes.length,
 				warnings: check.issues.length,
 			});
-			return "動画を作り始めました。数分かかり、できたら、頼まれたメッセージへの返信として投稿されます(15分たってもできなければ、作るのをやめて知らせます)。作り始めたことを、利用者に短く伝えてください。";
+			return "動画を作り始めました。数分かかり、できたら、頼まれたメッセージへの返信として投稿されます(15分たってもできなければ、作るのをやめて知らせます)。作り始めたことを、利用者に短く伝えてください。返答は、台本の読み上げ文の口調ではなく、いつもの口調で書いてください。";
 		},
 	};
+}
+
+/**
+ * 選んだ話者のものではない口調(ずんだもんの「〜のだ」など)で書かれた読み上げ文。
+ * 口調の決まった話者は、その口調だけを Dopagakix が確かめる。ほかの話者は、です・ます調で書くので、
+ * 決まった口調の文末が残っていれば直させる(既定のずんだもんの口調が、ほかの話者に移らないように)
+ */
+export function otherPersonaIssues(
+	script: ConversationScript,
+	speaker: VideoSpeaker,
+	persona: Persona | null,
+): { at: string; message: string }[] {
+	const others = BUILTIN_PERSONAS.filter(
+		(candidate) =>
+			candidate.id !== persona?.id && candidate.endingPattern !== undefined,
+	);
+	const narrations = [
+		{ at: "opening.narration", lines: script.opening.narration },
+		...script.scenes.map((scene, index) => ({
+			at: `scenes[${index}].narration`,
+			lines: scene.narration,
+		})),
+		{ at: "closing.narration", lines: script.closing.narration },
+	];
+	const issues: { at: string; message: string }[] = [];
+	for (const { at, lines } of narrations) {
+		lines.forEach((line, index) => {
+			const text = line.trim();
+			const other = others.find((candidate) =>
+				new RegExp(candidate.endingPattern as string).test(text),
+			);
+			if (text === "" || other === undefined) {
+				return;
+			}
+			issues.push({
+				at: `${at}[${index}]`,
+				message:
+					persona === null
+						? `${other.name}の口調になっています。${speaker.name}の読み上げ文は、です・ます調で書いてください:「${text}」`
+						: `${other.name}の口調になっています。${persona.name}の口調で書いてください:「${text}」`,
+			});
+		});
+	}
+	return issues;
 }
 
 /** 引用が、読んだ発言の本文の一部をそのまま使っているか。発言した人の名前も確かめる。問題ごとに1行 */
