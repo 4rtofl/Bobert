@@ -208,6 +208,155 @@ describe("prepare_video", () => {
 	});
 });
 
+describe("prepare_video のリンク先のページ", () => {
+	/** URLごとに決めた応答を返す、偽物の取得。取得したURLを記録する */
+	function fakeFetch(pages: Record<string, Response | Error>) {
+		const fetched: string[] = [];
+		const fetcher = async (url: string) => {
+			fetched.push(url);
+			const page = pages[url];
+			if (page === undefined || page instanceof Error) {
+				throw page ?? new Error("not found");
+			}
+			return page;
+		};
+		return { fetched, fetcher };
+	}
+
+	function html(body: string): Response {
+		return new Response(body, {
+			headers: { "content-type": "text/html; charset=utf-8" },
+		});
+	}
+
+	it("発言に貼られたURLの先のページを読んで、本文を添える。読めなかったページは理由を書き、断らないよう伝える", async () => {
+		const shared = said(
+			0,
+			BOB,
+			"この記事おもしろい https://example.com/article",
+			{
+				embeds: [
+					{
+						type: "link" as never,
+						url: "https://example.com/article",
+						title: "新しい研究の話",
+						description: "研究チームは…",
+					},
+				],
+			},
+		);
+		const broken = said(1, ALICE, "こっちは? <https://example.org/missing>");
+		const trigger = said(2, ALICE, "<@0> これを動画にして");
+		const { fetched, fetcher } = fakeFetch({
+			"https://example.com/article": html(
+				"<html><head><title>新しい研究の話</title></head><body><nav>メニュー</nav><article><h1>新しい研究の話</h1><p>研究チームは、睡眠と記憶の関係を調べた。</p></article></body></html>",
+			),
+			"https://example.org/missing": new Response("no", { status: 404 }),
+		});
+		const material = newVideoMaterial();
+		const tool = prepareVideoTool(
+			fakeHistory([shared, broken, trigger]),
+			BOT.id,
+			requesterFor(trigger),
+			material,
+			fetcher,
+		);
+
+		const result = await tool.run({});
+
+		expect(fetched.sort()).toEqual([
+			"https://example.com/article",
+			"https://example.org/missing",
+		]);
+		expect(result).toContain("## リンク先のページ");
+		expect(result).toContain("### https://example.com/article");
+		expect(result).toContain("タイトル: 新しい研究の話");
+		expect(result).toContain("研究チームは、睡眠と記憶の関係を調べた。");
+		// <article>があれば、その外(メニューなど)は入れない
+		expect(result).not.toContain("メニュー");
+		expect(result).toContain(
+			"- https://example.org/missing: 読めませんでした(HTTP 404)",
+		);
+		expect(result).toContain("動画を作るのをやめないでください。");
+		// ページは発言として数えない
+		expect(material.messages.size).toBe(2);
+	});
+
+	it("URLがなければ、ページの節を添えない", async () => {
+		const trigger = said(3, ALICE, "<@0> これを動画にして");
+		const { fetched, fetcher } = fakeFetch({});
+		const result = await prepareVideoTool(
+			fakeHistory([...CONVERSATION, trigger]),
+			BOT.id,
+			requesterFor(trigger),
+			newVideoMaterial(),
+			fetcher,
+		).run({});
+
+		expect(fetched).toEqual([]);
+		expect(result).not.toContain("## リンク先のページ");
+	});
+
+	it("1回の返答で読むページは10件まで。新しい発言のURLから読み、同じURLは2度読まない", async () => {
+		const links = Array.from({ length: 12 }, (_, i) =>
+			said(i, BOB, `https://example.com/${i} と https://example.com/${i}`),
+		);
+		const trigger = said(20, ALICE, "<@0> これを動画にして");
+		const pages = Object.fromEntries(
+			links.map((_, i) => [
+				`https://example.com/${i}`,
+				html(`<p>ページ${i}</p>`),
+			]),
+		);
+		const { fetched, fetcher } = fakeFetch(pages);
+		const result = await prepareVideoTool(
+			fakeHistory([...links, trigger]),
+			BOT.id,
+			requesterFor(trigger),
+			newVideoMaterial(),
+			fetcher,
+		).run({});
+
+		expect(fetched).toHaveLength(10);
+		expect(fetched).not.toContain("https://example.com/0");
+		expect(fetched).not.toContain("https://example.com/1");
+		expect(result).toContain(
+			"- https://example.com/1: 1回の返答で読めるページ(10件)を超えたので、読んでいません",
+		);
+	});
+
+	it("リンク先のページの文は、引用に使えない", async () => {
+		const shared = said(0, BOB, "https://example.com/article");
+		const trigger = said(1, ALICE, "<@0> これを動画にして", {
+			author: { ...ALICE, id: "3101" },
+		});
+		const material = newVideoMaterial();
+		const requester = requesterFor(trigger, "3101");
+		await prepareVideoTool(
+			fakeHistory([shared, trigger]),
+			BOT.id,
+			requester,
+			material,
+			fakeFetch({
+				"https://example.com/article": html(
+					"<p>テストが終わってから決めよう</p>",
+				),
+			}).fetcher,
+		).run({});
+		const starter = recordingStarter();
+
+		const result = await createVideoTool(
+			env.DB,
+			requester,
+			material,
+			starter.start,
+		).run({ script: script("テストが終わってから決めよう", "bob") });
+
+		expect(result).toContain("scenes[1].text");
+		expect(starter.started).toEqual([]);
+	});
+});
+
 describe("create_video", () => {
 	/** 会話を読んだところまで進めた、道具と記録 */
 	async function prepared(userId: string) {
