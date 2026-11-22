@@ -233,7 +233,7 @@ async function addToKnowledge(
 		log("rejected", { ...fileDetail(file), reason, attempts, ...detail });
 	};
 	try {
-		// 要約の費用は送った人にかける(寄付は使わない)。要約のモデルを呼べなければ(Bobertにsigwのキーがない)、受け付けない。
+		// 要約の費用は送った人にかける。要約のモデルを呼べなければ(Bobertにsigwのキーがない)、受け付けない。
 		// 同じメッセージのほかのファイルも、まとめて受け付けないことにして、知らせるのは1回だけにする
 		const model = await deps.summaryModel(file.authorId);
 		if (model === null) {

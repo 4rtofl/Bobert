@@ -46,15 +46,6 @@ import {
 } from "./bobert-md";
 import { compactFromButton, compactFromMenu } from "./compact";
 import { confirmDelete, DELETE_CONFIRM_ID, deleteCommand } from "./delete";
-import {
-	DONATE_GIVE_ID,
-	DONATE_MODAL_ID,
-	DONATE_STOP_ID,
-	donateCommand,
-	donationModal,
-	stopDonation,
-	submitDonation,
-} from "./donate";
 import { EFFORT_SELECT_ID, effortCommand, selectEffort } from "./effort";
 import { EXPLAIN_COMMAND_NAME, explainFromMenu } from "./explain";
 import { FEAT_BUTTON_PREFIX, featCommand, toggleFeature } from "./feat";
@@ -130,8 +121,8 @@ async function route(
 	if (!user) {
 		return notReady();
 	}
-	// 寄付とスキルとBobert.mdは、サーバーごと。
-	// 操作した人の名前は、サーバーで見えている名前(寄付した人や、スキルとBobert.mdを編集した人として見せる)
+	// スキルとBobert.mdは、サーバーごと。
+	// 操作した人の名前は、サーバーで見えている名前(スキルとBobert.mdを編集した人として見せる)
 	const guildId = interaction.guild_id;
 	const actor = {
 		id: user.id,
@@ -248,9 +239,6 @@ async function route(
 			}
 			if (interaction.data.name === "settings") {
 				return settingsCommand(interaction, env, ctx, user.id, guildId);
-			}
-			if (interaction.data.name === "donate" && guildId) {
-				return donateCommand(env, guildId, actor);
 			}
 			if (interaction.data.name === IMPORT_COMMAND_NAME && guildId) {
 				return importCommand(interaction, env, guildId, user.id);
@@ -387,12 +375,6 @@ async function route(
 			if (interaction.data.custom_id === DELETE_CONFIRM_ID) {
 				return confirmDelete(env, ctx, user.id);
 			}
-			if (interaction.data.custom_id === DONATE_GIVE_ID) {
-				return donationModal(env, user.id);
-			}
-			if (interaction.data.custom_id === DONATE_STOP_ID && guildId) {
-				return stopDonation(env, guildId, actor);
-			}
 			break;
 		}
 		case InteractionType.ModalSubmit:
@@ -407,9 +389,6 @@ async function route(
 			}
 			if (interaction.data.custom_id === MEMORY_EDIT_MODAL_ID && guildId) {
 				return submitMemoryEdit(interaction, env, user.id, guildId);
-			}
-			if (interaction.data.custom_id === DONATE_MODAL_ID && guildId) {
-				return submitDonation(interaction, env, guildId, actor);
 			}
 			if (
 				interaction.data.custom_id.startsWith(BOBERTMD_MODAL_PREFIX) &&

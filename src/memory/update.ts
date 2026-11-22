@@ -41,7 +41,7 @@ import { MEMORY_KEY_REQUIRED } from "./texts";
 
 /**
  * 記憶の更新(仕様: docs/spec/architecture.md「記憶」)。
- * 本人の発言から、覚えておくことの一覧を、本人の費用でClaude Haiku 5.5に(sigw経由で)まとめ直させる。寄付は使わない
+ * 本人の発言から、覚えておくことの一覧を、本人の費用でClaude Haiku 5.5に(sigw経由で)まとめ直させる
  */
 
 /** まとめるのに使うモデル(候補の一覧のキー) */

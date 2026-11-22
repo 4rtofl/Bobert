@@ -3,7 +3,7 @@ import { KNOWLEDGE_SUMMARY_PROMPT } from "./texts";
 
 /**
  * 知識のファイルの要約(仕様: docs/spec/architecture.md「知識チャンネル」)。
- * 送った人のキーで、Claude Haiku 5.5に作らせる。記憶と同じく、本人が /model で選んだモデルは使わず、寄付も使わない
+ * 送った人のキーで、Claude Haiku 5.5に作らせる。記憶と同じく、本人が /model で選んだモデルは使わない
  */
 
 /** 要約に使うモデル(候補の一覧のキー) */

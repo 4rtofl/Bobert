@@ -23,7 +23,6 @@ import {
 import { annotationsFor, refreshImageUrls } from "./history";
 import { allowedMentions } from "./members";
 import { selectedCandidate } from "./model";
-import { paidNote } from "./payer";
 import { RATE_LIMITED_TEXT, REFUSAL_TEXT } from "./replies";
 import { splitMessage } from "./split";
 import { threadPreface } from "./thread";
@@ -178,7 +177,6 @@ async function askJevWith(
 		source: job.source ?? "menu",
 		provider: model.provider,
 		model: model.modelId,
-		payer: context.payer.kind,
 		stopReason: result.stopReason,
 		durationMs: Date.now() - startedAt,
 		toolCalls: result.toolCalls,
@@ -190,7 +188,7 @@ async function askJevWith(
 		fileReads: fileReads.calls,
 		...result.usage,
 	});
-	// 利用量の表示と寄付の行は、AIの分だけ(Jevの費用は、利用量の表示に入れない)
+	// 利用量の表示は、AIの分だけ(Jevの費用は、利用量の表示に入れない)
 	const notes = [
 		settings.featUsageDisplay
 			? await usageNote(
@@ -199,7 +197,6 @@ async function askJevWith(
 					selectedCandidate(settings),
 				)
 			: null,
-		await paidNote(env, context.payer),
 	].filter((line) => line !== null);
 	return [resultBody(outcome, result), ...notes].join("\n");
 }

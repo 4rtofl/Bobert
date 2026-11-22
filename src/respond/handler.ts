@@ -76,16 +76,8 @@ import {
 	selectedCandidate,
 	usesCustomModel,
 } from "./model";
-import {
-	chargeDonationFor,
-	type PaidModel,
-	type Payer,
-	paidNote,
-	pauseIfDonorKeyFailed,
-	resolvePaidModel,
-} from "./payer";
 import { buildSystemPrompt } from "./prompt";
-import { describeLlmError, formatReply } from "./replies";
+import { describeLlmError, formatReply, resolveReplyModel } from "./replies";
 import { splitMessage } from "./split";
 import {
 	conversationSize,
@@ -252,19 +244,16 @@ export interface ReplyModel {
 	model: ResolvedModel;
 	/** sigw経由でAIを呼ぶ人。費用を払う人(頼んだ本人)で、モデル情報の取得にも使う */
 	caller: SigwCaller;
-	/** 費用を払う人(本人か、サーバーに寄付した人) */
-	payer: Payer;
 	/** 設定していなければ既定の段階、モデルが選べなければいちばん近い段階 */
 	effort: string | null;
-	/** AIを呼ぶ。寄付で答えるときは、呼んだ分の費用を寄付から差し引く */
+	/** sigw経由でAIを呼ぶ */
 	callModel: (request: ChatRequest) => Promise<ChatResult>;
 }
 
 /**
  * 本人の設定とモデルで、返答を作る(メンションへの返答、「Bobertに聞く」、要約で共通)。
  * AIはsigw経由で呼び、費用は本人が払う(仕様: docs/spec/llm-cost.md「AIの呼び出しと費用の負担」)。
- * モデルを呼べなければその理由を、AIの呼び出しに失敗したら理由を、notAnswerで返す。
- * 寄付した人のキーが無効か残高不足なら、その寄付を止めて、次の寄付か本人のキーで答え直す
+ * モデルを呼べなければその理由を、AIの呼び出しに失敗したら理由を、notAnswerで返す
  */
 export async function withReplyModel<T>(
 	env: Env,
@@ -272,82 +261,44 @@ export async function withReplyModel<T>(
 	compose: (context: ReplyModel) => Promise<T>,
 	notAnswer: (text: string) => T,
 ): Promise<T> {
-	const { userId, guildId } = requester;
+	const { userId } = requester;
 	const settings = await getUserSettings(env.DB, userId);
-	// キーが使えなかった寄付は、止めたうえで、この返答ではもう使わない(答え直しが必ず終わるように)
-	const failedDonors = new Set<string>();
-	for (;;) {
-		const paid = await resolvePaidModel(env, {
-			userId,
-			guildId,
-			settings,
-			checkMembership: true,
-			skipDonors: failedDonors,
-		});
-		if (!paid.ok) {
-			log("setup_required", { userId, missing: paid.missing });
-			return notAnswer(paid.guidance);
-		}
-		const { model, payer } = paid;
-		const context: ReplyModel = {
-			userId,
-			settings,
-			model,
-			caller: { env, userId: paid.billedUserId },
-			payer,
-			effort: await replyEffort(env, userId, settings, model),
-			callModel: paidCall(env, paid, settings),
-		};
-		const startedAt = Date.now();
-		try {
-			return await compose(context);
-		} catch (error) {
-			if (!(error instanceof LlmError)) {
-				throw error;
-			}
-			log("llm_failed", {
-				userId,
-				provider: model.provider,
-				model: model.modelId,
-				payer: payer.kind,
-				kind: error.kind,
-				status: error.status,
-				detail: error.detail,
-				durationMs: Date.now() - startedAt,
-			});
-			const pausedDonor = await pauseIfDonorKeyFailed(env, payer, error);
-			if (pausedDonor !== null) {
-				failedDonors.add(pausedDonor);
-				continue;
-			}
-			return notAnswer(describeLlmError(error, model));
-		}
+	const resolution = resolveReplyModel(env, settings);
+	if (!resolution.ok) {
+		log("setup_required", { userId, missing: resolution.missing });
+		return notAnswer(resolution.guidance);
 	}
-}
-
-/** 費用を払う人の分として、sigw経由でAIを呼ぶ関数。寄付で答えるときは、呼ぶたびに、その分の費用を寄付から差し引く */
-function paidCall(
-	env: Env,
-	{ payer, model, billedUserId }: PaidModel,
-	settings: UserSettings,
-): (request: ChatRequest) => Promise<ChatResult> {
-	const caller = { env, userId: billedUserId };
-	return async (request) => {
-		const result =
+	const { model } = resolution;
+	const caller = { env, userId };
+	const context: ReplyModel = {
+		userId,
+		settings,
+		model,
+		caller,
+		effort: await replyEffort(env, userId, settings, model),
+		callModel: (request) =>
 			model.provider === "anthropic"
-				? await chatWithAnthropic(caller, request)
-				: await chatWithOpenRouter(caller, request);
-		if (payer.kind === "donation") {
-			await chargeDonationFor(
-				env,
-				payer,
-				result.requestUsages,
-				model,
-				settings,
-			);
-		}
-		return result;
+				? chatWithAnthropic(caller, request)
+				: chatWithOpenRouter(caller, request),
 	};
+	const startedAt = Date.now();
+	try {
+		return await compose(context);
+	} catch (error) {
+		if (!(error instanceof LlmError)) {
+			throw error;
+		}
+		log("llm_failed", {
+			userId,
+			provider: model.provider,
+			model: model.modelId,
+			kind: error.kind,
+			status: error.status,
+			detail: error.detail,
+			durationMs: Date.now() - startedAt,
+		});
+		return notAnswer(describeLlmError(error, model));
+	}
 }
 
 /** AIの答えではない返答(AIを呼び出せないことや、エラーの理由) */
@@ -414,7 +365,6 @@ async function composeAnswer(
 			userId: context.userId,
 			provider: context.model.provider,
 			model: context.model.modelId,
-			payer: context.payer.kind,
 			trigger: "auto",
 			conversationTokens: size,
 			failure: result.failure,
@@ -647,7 +597,6 @@ export async function answer(
 		userId,
 		provider: model.provider,
 		model: model.modelId,
-		payer: context.payer.kind,
 		messages: chain.length,
 		summarized: summary !== null,
 		stopReason: result.stopReason,
@@ -714,8 +663,6 @@ export async function answer(
 						selectedCandidate(settings),
 					)
 				: null,
-			// 寄付で答えたら、毎回書く(費用は、呼んだときに寄付から差し引いてある)
-			donation: await paidNote(env, context.payer),
 			compaction: offerCompaction ? threshold : null,
 		}),
 		// 道具で何回かに分けて呼んだときは、最初の1回の分(後の回には、道具の結果が入るため)

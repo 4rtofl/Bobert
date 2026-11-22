@@ -21,7 +21,6 @@ import {
 	MEMORY_CLEAR_CONFIRM,
 	MEMORY_CLEARED,
 	MEMORY_COST_NOTE,
-	MEMORY_DONATION_NOTE,
 	MEMORY_EMPTY,
 	MEMORY_KEPT_NOTE,
 	MEMORY_KEY_REQUIRED,
@@ -147,12 +146,7 @@ function buttons(...entries: [style: number, label: string, id: string][]) {
 	];
 }
 
-const OFF_SCREEN = [
-	"**記憶**: OFF",
-	MEMORY_OFF_EXPLANATION,
-	MEMORY_COST_NOTE,
-	MEMORY_DONATION_NOTE,
-];
+const OFF_SCREEN = ["**記憶**: OFF", MEMORY_OFF_EXPLANATION, MEMORY_COST_NOTE];
 const ON_BUTTONS = buttons(
 	[1, "直す", "memory:edit"],
 	[2, "全部消す", "memory:clear"],

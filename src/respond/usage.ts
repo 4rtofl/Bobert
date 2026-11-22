@@ -60,48 +60,6 @@ export function costFromPricing(
 }
 
 /**
- * APIを呼んだ分の費用(USD)。寄付から差し引くのに使う(仕様: docs/spec/llm-cost.md「クレジットの寄付」)。
- * 利用量の表示と同じ計算にし、それでも分からない回(単価を取得できなかったときなど)は、候補の一覧の単価で見積もる。
- * 寄付は候補のモデルにしか使わないので、候補が必ずある
- */
-export async function chargeableCost(
-	requestUsages: readonly TokenUsage[],
-	model: ResolvedModel,
-	candidate: ModelCandidate,
-): Promise<number> {
-	const pricing =
-		model.provider === "anthropic" &&
-		requestUsages.some((usage) => usage.costUsd === null)
-			? await claudePricing(candidate.openRouterId)
-			: null;
-	return requestUsages.reduce(
-		(sum, usage) =>
-			sum +
-			(usage.costUsd ??
-				(pricing === null
-					? listPriceCost(candidate, usage)
-					: costFromPricing(pricing, usage))),
-		0,
-	);
-}
-
-/** Web検索の1回の単価の見積もり(USD)。AnthropicのWeb検索の単価(1,000回あたり$10) */
-const WEB_SEARCH_LIST_PRICE = 0.01;
-
-/**
- * 候補の一覧の単価(100万トークンあたりの入力と出力)での見積もり。
- * キャッシュの割引と、入力が多いときの単価は数えない
- */
-function listPriceCost(candidate: ModelCandidate, usage: TokenUsage): number {
-	return (
-		(usage.inputTokens * candidate.price.input +
-			usage.outputTokens * candidate.price.output) /
-			1_000_000 +
-		usage.webSearchRequests * WEB_SEARCH_LIST_PRICE
-	);
-}
-
-/**
  * Anthropicで直接呼んだときの費用。単価の段階は1回ごとに決まるので、1回ずつ計算して足す。
  * 単価を取得できなければnull
  */
@@ -135,7 +93,7 @@ function formatCount(count: number): string {
 }
 
 /** 費用の書き方。1ドル以上は小数点以下2桁、それより小さければ、上から2桁まで書く(0.0021、0.12) */
-export function formatCost(usd: number): string {
+function formatCost(usd: number): string {
 	if (usd >= 1) {
 		return usd.toFixed(2);
 	}

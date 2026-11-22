@@ -207,11 +207,6 @@ export const COMMANDS: RESTPutAPIApplicationCommandsJSONBody = [
 	},
 	{
 		...GUILD_ONLY,
-		name: "donate",
-		description: "サーバーの全員が使えるクレジットの寄付と、残りの確認",
-	},
-	{
-		...GUILD_ONLY,
 		name: IMPORT_COMMAND_NAME,
 		description:
 			"Botが見られるチャンネルの過去のメッセージの取り込みと、進み具合の確認(サーバー管理者用)",

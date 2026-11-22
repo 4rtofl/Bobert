@@ -8,7 +8,6 @@ import type { CompactJob } from "../queue/messages";
 import { historyFor, type ReplyModel, withReplyModel } from "./handler";
 import { type HistoryDeps, namesFor, readConversation } from "./history";
 import { selectedCandidate } from "./model";
-import { paidNote } from "./payer";
 import { LLM_ERROR_TEXT, REFUSAL_TEXT } from "./replies";
 import { KEEP_RECENT_MESSAGES, summarizeOlderPart } from "./summary";
 import { usageNote } from "./usage";
@@ -30,7 +29,6 @@ interface CompactResult {
 /**
  * 会話の要約の仕事(仕様: docs/spec/architecture.md「長い会話の自動要約」)。
  * 押した人(選んだ人)のキーで、そのメッセージまでの会話を要約し、保留にした応答を結果に書き換える。
- * サーバーに寄付があれば、寄付した人のキーで要約する(仕様: docs/spec/llm-cost.md「クレジットの寄付」)。
  * 案内のボタンから要約したら、ボタンを消す(ほかの人が続けて押さないように)。
  * 要約した後は、失敗してもやり直さない(やり直すと、もう一度要約して費用がかかるため)
  */
@@ -102,7 +100,6 @@ async function summarize(
 		userId: context.userId,
 		provider: context.model.provider,
 		model: context.model.modelId,
-		payer: context.payer.kind,
 		trigger: job.buttonMessageId === null ? "menu" : "button",
 		failure: result.failure,
 		...sumUsage(result.usages),
@@ -120,12 +117,8 @@ async function summarize(
 				selectedCandidate(context.settings),
 			)
 		: null;
-	// 寄付で要約したら、利用量の行の下に書く
-	const donation = await paidNote(env, context.payer);
 	return {
-		content: [SUMMARIZED, usage, donation]
-			.filter((line) => line !== null)
-			.join("\n"),
+		content: [SUMMARIZED, usage].filter((line) => line !== null).join("\n"),
 		summarized: true,
 	};
 }

@@ -13,7 +13,7 @@ export interface UserModel {
 
 /**
  * 本人の費用で、決まったモデル(候補の一覧のキー)をsigw経由で呼ぶ準備をする
- * (記憶のまとめと、知識のファイルの要約。本人がその場で頼んでいないのにAIを呼ぶため、寄付は使わない)。
+ * (記憶のまとめと、知識のファイルの要約)。
  * Bobertにsigwのキーがあれば、Anthropicは直接、なければOpenRouter経由で呼ぶ。呼べなければnull
  */
 export function userModel(

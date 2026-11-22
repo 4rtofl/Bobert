@@ -367,10 +367,9 @@ describe("返答の注記", () => {
 		};
 	}
 
-	it("聞き取った内容は、返答の後、利用量と寄付の行より上に書く", () => {
+	it("聞き取った内容は、返答の後、利用量の行より上に書く", () => {
 		const heard = heardNote("明日の午後3時から");
 		const usage = "-# 入力 10トークン・出力 5トークン・約$0.0001";
-		const donation = "-# 寄付されたクレジットで答えました(残り 約$1.00)";
 
 		expect(
 			formatReply(chatResult("了解!"), {
@@ -378,9 +377,8 @@ describe("返答の注記", () => {
 				imagesSkipped: false,
 				webSearchSkipped: false,
 				usage,
-				donation,
 			}),
-		).toBe(["了解!", heard, usage, donation].join("\n"));
+		).toBe(["了解!", heard, usage].join("\n"));
 		expect(
 			formatReply(chatResult("", "refusal"), {
 				heard,

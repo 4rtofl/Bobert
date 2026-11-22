@@ -24,7 +24,6 @@ import {
 import { revokeGitHubAuthorization } from "../github/account";
 import { logEvent } from "../log";
 import { DELETE_MEMORY_NOTE } from "../memory/texts";
-import { isDonating } from "../store/donations";
 import { hasGitHubLink, loadGitHubLink } from "../store/github";
 import { deleteUserMemory, hasAnyMemory } from "../store/memory";
 import { deleteUserData } from "../store/users";
@@ -40,8 +39,7 @@ import { DELETE_VIDEO_NOTE } from "../video/texts";
 export const DELETE_CONFIRM_ID = "delete:confirm";
 
 /**
- * /delete: 消してよいか、本人にだけ確かめる。寄付している人には、寄付も使われなくなることを書く。
- * 記憶を使ったことがある人には、記憶も消すことを、
+ * /delete: 消してよいか、本人にだけ確かめる。記憶を使ったことがある人には、記憶も消すことを、
  * エージェントのチャンネルがある人には、チャンネルとセッションも消すことを、
  * GitHubと連携している人には、連携も外すことを書く
  */
@@ -49,9 +47,6 @@ export async function deleteCommand(
 	env: Env,
 	userId: string,
 ): Promise<APIInteractionResponse> {
-	const donation = (await isDonating(env.DB, userId))
-		? "寄付したクレジットも、使われなくなります。"
-		: "";
 	const memory = (await hasAnyMemory(env.DB, userId)) ? DELETE_MEMORY_NOTE : "";
 	const agents =
 		(await agentChannelsOf(env.DB, userId)).length > 0
@@ -65,7 +60,7 @@ export async function deleteCommand(
 		type: InteractionResponseType.ChannelMessageWithSource,
 		data: {
 			flags: MessageFlags.Ephemeral,
-			content: `登録したAPIキー(Anthropic、OpenRouter)と設定を、すべて削除します。${donation}${memory}${agents}${video}${github}よろしいですか?`,
+			content: `登録したAPIキー(Anthropic、OpenRouter)と設定を、すべて削除します。${memory}${agents}${video}${github}よろしいですか?`,
 			components: [
 				{
 					type: ComponentType.ActionRow,
