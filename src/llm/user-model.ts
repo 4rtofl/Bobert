@@ -16,14 +16,14 @@ export interface UserModel {
  * (記憶のまとめと、知識のファイルの要約)。
  * Bobertにsigwのキーがあれば、Anthropicは直接、なければOpenRouter経由で呼ぶ。呼べなければnull
  */
-export function userModel(
+export async function userModel(
 	env: Env,
 	userId: string,
 	modelKey: string,
-): UserModel | null {
+): Promise<UserModel | null> {
 	const resolution = resolveModel(
 		{ ...DEFAULT_USER_SETTINGS, modelKey },
-		sigwProviders(env),
+		await sigwProviders(env),
 	);
 	if (!resolution.ok) {
 		return null;

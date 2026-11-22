@@ -14,7 +14,7 @@ import {
 	JEV_QUESTION_OPTION,
 	type JevSource,
 } from "../jev/texts";
-import { AI_UNAVAILABLE_TEXT } from "../llm/sigw";
+import { AI_UNAVAILABLE_TEXT, jevAvailable } from "../llm/sigw";
 import type { QueueMessage, StoredMessageInput } from "../queue/messages";
 import { fromDiscord } from "../respond/history";
 import { resolveReplyModel } from "../respond/replies";
@@ -98,11 +98,14 @@ async function startJev(
 	target: () => StoredMessageInput,
 ): Promise<APIInteractionResponse> {
 	const guildId = interaction.guild_id ?? null;
-	const paid = resolveReplyModel(env, await getUserSettings(env.DB, user.id));
+	const paid = await resolveReplyModel(
+		env,
+		await getUserSettings(env.DB, user.id),
+	);
 	if (!paid.ok) {
 		return ephemeral(paid.guidance);
 	}
-	if (!env.SIGW_TYPESAFE_KEY) {
+	if (!(await jevAvailable(env))) {
 		return ephemeral(AI_UNAVAILABLE_TEXT);
 	}
 	const message = target();

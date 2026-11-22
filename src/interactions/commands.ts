@@ -52,6 +52,7 @@ import {
 	PLUGINS_RELOAD_OPTION,
 	PLUGINS_RELOAD_OPTION_DESCRIPTION,
 } from "./plugins";
+import { SIGW_COMMAND_DESCRIPTION, SIGW_COMMAND_NAME } from "./sigw";
 import {
 	SKILLS_COMMAND_NAME,
 	SKILLS_FILE_OPTION,
@@ -224,6 +225,13 @@ export const COMMANDS: RESTPutAPIApplicationCommandsJSONBody = [
 				channel_types: [...KNOWLEDGE_CHANNEL_TYPES],
 			},
 		],
+	},
+	{
+		...GUILD_ONLY,
+		name: SIGW_COMMAND_NAME,
+		description: SIGW_COMMAND_DESCRIPTION,
+		// 使えるのは、サーバー管理の権限を持つ人(/import と同じ)。設定で変えられるので、受けたときにも確かめる
+		default_member_permissions: String(PermissionFlags.ManageGuild),
 	},
 	{
 		...GUILD_ONLY,

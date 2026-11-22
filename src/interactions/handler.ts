@@ -74,6 +74,13 @@ import {
 import { PROMPT_MODAL_ID, promptCommand, submitPrompt } from "./prompt";
 import { settingsCommand } from "./settings";
 import {
+	SIGW_COMMAND_NAME,
+	SIGW_ID_PREFIX,
+	sigwCommand,
+	sigwComponent,
+	submitSigwModal,
+} from "./sigw";
+import {
 	SKILLS_COMMAND_NAME,
 	SKILLS_ID_PREFIX,
 	skillComponent,
@@ -231,6 +238,9 @@ async function route(
 			if (interaction.data.name === "settings") {
 				return settingsCommand(interaction, env, ctx, user.id, guildId);
 			}
+			if (interaction.data.name === SIGW_COMMAND_NAME && guildId) {
+				return sigwCommand(interaction, env);
+			}
 			if (interaction.data.name === IMPORT_COMMAND_NAME && guildId) {
 				return importCommand(interaction, env, guildId, user.id);
 			}
@@ -327,6 +337,12 @@ async function route(
 					return response;
 				}
 			}
+			if (interaction.data.custom_id.startsWith(SIGW_ID_PREFIX) && guildId) {
+				const response = sigwComponent(interaction);
+				if (response) {
+					return response;
+				}
+			}
 			if (interaction.data.custom_id.startsWith(PLUGINS_ID_PREFIX) && guildId) {
 				const response = await pluginComponent(
 					interaction,
@@ -388,6 +404,12 @@ async function route(
 					ctx,
 					user.id,
 				);
+				if (response) {
+					return response;
+				}
+			}
+			if (interaction.data.custom_id.startsWith(SIGW_ID_PREFIX) && guildId) {
+				const response = await submitSigwModal(interaction, env, user.id);
 				if (response) {
 					return response;
 				}

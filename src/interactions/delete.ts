@@ -132,7 +132,7 @@ async function removeAgents(
 	vaultId: string | null,
 ): Promise<void> {
 	// Bobertにsigwのキーがなければ、Bobertのワークスペースのものは消せない
-	const client = agentsAvailable(env) ? agentClient(env, userId) : null;
+	const client = (await agentsAvailable(env)) ? agentClient(env, userId) : null;
 	for (const channel of channels) {
 		try {
 			await agentSessionStub(env, channel.channelId).purge();
@@ -183,7 +183,7 @@ async function removeVideo(
 				});
 			});
 	}
-	if (resources !== null && agentsAvailable(env)) {
+	if (resources !== null && (await agentsAvailable(env))) {
 		await retireAgentResources(agentClient(env, userId), resources).catch(
 			(error: unknown) => {
 				logEvent("video", "resources_cleanup_failed", {

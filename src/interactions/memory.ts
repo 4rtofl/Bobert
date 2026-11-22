@@ -125,7 +125,7 @@ async function turnOn(
 	guildId: string,
 ): Promise<APIInteractionResponse> {
 	// まとめる費用は本人にかける。Bobertにsigwのキーがなければ、まとめられない
-	if (sigwProviders(env).size === 0) {
+	if ((await sigwProviders(env)).size === 0) {
 		return {
 			type: InteractionResponseType.ChannelMessageWithSource,
 			data: { flags: MessageFlags.Ephemeral, content: MEMORY_KEY_REQUIRED },

@@ -4,7 +4,7 @@ import { formatJevAnswers } from "../jev/format";
 import { JEV_REQUEST, JEV_SYSTEM_PROMPT } from "../jev/prompt";
 import { JEV_ERROR, JEV_NO_QUESTION, jevNoTools } from "../jev/texts";
 import { askJevTool, emptyJevOutcome, type JevOutcome } from "../jev/tool";
-import { AI_UNAVAILABLE_TEXT } from "../llm/sigw";
+import { AI_UNAVAILABLE_TEXT, jevAvailable } from "../llm/sigw";
 import type { ChatResult } from "../llm/types";
 import { logEvent } from "../log";
 import type { JevJob, StoredMessageInput } from "../queue/messages";
@@ -65,8 +65,8 @@ export async function handleJevJob(job: JevJob, env: Env): Promise<void> {
 
 async function askAndPost(job: JevJob, env: Env): Promise<void> {
 	const source = job.source ?? "menu";
-	// 右クリックメニューか`/jev`を使った後に、TypeSafe用のsigwのキーが外された
-	const text = !env.SIGW_TYPESAFE_KEY
+	// 右クリックメニューか`/jev`を使った後に、sigwのキーでTypeSafeを呼べなくなった
+	const text = !(await jevAvailable(env))
 		? AI_UNAVAILABLE_TEXT
 		: await withReplyModel(
 				env,

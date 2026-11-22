@@ -25,11 +25,11 @@ export type ReplyModelResolution =
  * (仕様: docs/spec/llm-cost.md「AIの呼び出しと費用の負担」)。
  * 費用は、頼んだ本人がsigwで払う。呼べなければ、本人に見せる理由を付けて返す
  */
-export function resolveReplyModel(
+export async function resolveReplyModel(
 	env: Env,
 	settings: UserSettings,
-): ReplyModelResolution {
-	const resolution = resolveModel(settings, sigwProviders(env));
+): Promise<ReplyModelResolution> {
+	const resolution = resolveModel(settings, await sigwProviders(env));
 	return resolution.ok
 		? resolution
 		: {

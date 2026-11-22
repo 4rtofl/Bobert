@@ -21,6 +21,7 @@ import {
 	saveChannels,
 } from "../src/store/channels";
 import { ALICE, BOT } from "./fixtures";
+import { fakeSigwWith, TEST_SIGW_KEY } from "./sigw";
 
 // テスト専用の秘密鍵(本物の秘密ではない)。
 // 対になる公開鍵は vitest.config.ts の DISCORD_PUBLIC_KEY に入れてある。
@@ -115,19 +116,27 @@ export function userFactory(firstId: number) {
 /** sigw経由でAIを呼ぶ人(AIの呼び出しを直接試すテスト用) */
 export const TEST_CALLER: SigwCaller = { env, userId: ALICE.id };
 
-/** sigwのキーが、OpenRouterの分しかない環境(Claudeの候補も、OpenRouter経由で呼ぶ) */
+/** sigwのキーで呼べるプロバイダを、providersだけにした環境(sigwの偽物を差し替える) */
+export function sigwProvidersEnv(
+	providers: readonly string[],
+	base: Env = env,
+): Env {
+	return { ...base, SIGW: fakeSigwWith({ [TEST_SIGW_KEY]: providers }) };
+}
+
+/** sigwのキーで、OpenRouterしか呼べない環境(Claudeの候補も、OpenRouter経由で呼ぶ) */
 export function openRouterOnlyEnv(base: Env = env): Env {
-	return { ...base, SIGW_ANTHROPIC_KEY: "" };
+	return sigwProvidersEnv(["openrouter", "typesafe"], base);
 }
 
-/** sigwのキーが、Anthropicの分しかない環境(Claude以外は使えない) */
+/** sigwのキーで、Anthropicしか呼べない環境(Claude以外は使えない) */
 export function anthropicOnlyEnv(base: Env = env): Env {
-	return { ...base, SIGW_OPENROUTER_KEY: "" };
+	return sigwProvidersEnv(["anthropic", "typesafe"], base);
 }
 
-/** sigwのキーが、どちらもない環境(AIを呼び出せない) */
+/** sigwのキーで、AnthropicもOpenRouterも呼べない環境(AIを呼び出せない) */
 export function noSigwEnv(base: Env = env): Env {
-	return { ...base, SIGW_ANTHROPIC_KEY: "", SIGW_OPENROUTER_KEY: "" };
+	return sigwProvidersEnv([], base);
 }
 
 /** OpenRouterのモデル一覧に載せるモデル */

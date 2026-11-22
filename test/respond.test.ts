@@ -29,6 +29,7 @@ import {
 	noSigwEnv,
 	openRouterOnlyEnv,
 } from "./helpers";
+import { TEST_SIGW_KEY } from "./sigw";
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -263,7 +264,7 @@ describe("メンションと返信への応答", () => {
 			(call) => call.url.hostname === "api.anthropic.com",
 		);
 		expect(request?.url.pathname).toBe("/v1/messages");
-		expect(request?.headers.get("x-api-key")).toBe("sgk-anthropic-test");
+		expect(request?.headers.get("x-api-key")).toBe(TEST_SIGW_KEY);
 		expect(request?.headers.get("x-sigw-user")).toBe(user.id);
 		expect(request?.body).toMatchObject({
 			model: "claude-haiku-5-5",
@@ -293,7 +294,7 @@ describe("メンションと返信への応答", () => {
 		const request = calls.find(
 			(call) => call.url.hostname === "api.anthropic.com",
 		);
-		expect(request?.headers.get("x-api-key")).toBe("sgk-anthropic-test");
+		expect(request?.headers.get("x-api-key")).toBe(TEST_SIGW_KEY);
 		expect(request?.headers.get("anthropic-workspace-id")).toBeNull();
 		expect(posted(calls)[0]?.content).toBe("こんにちは!");
 	});
@@ -407,7 +408,7 @@ describe("メンションと返信への応答", () => {
 			provider: { data_collection: "deny" },
 		});
 		expect(request?.headers.get("authorization")).toBe(
-			"Bearer sgk-openrouter-test",
+			`Bearer ${TEST_SIGW_KEY}`,
 		);
 		expect(request?.headers.get("x-sigw-user")).toBe(user.id);
 		expect(posted(calls)[0]?.content).toContain(AI_UNAVAILABLE_TEXT);

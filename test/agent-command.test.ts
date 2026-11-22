@@ -57,6 +57,7 @@ import {
 	testGuildRoles,
 	userFactory,
 } from "./helpers";
+import { TEST_SIGW_KEY } from "./sigw";
 
 const newUser = userFactory(61000);
 const GUILD_ID = "900";
@@ -363,7 +364,7 @@ describe("/agent", () => {
 			(call) => call.method === "POST" && call.url.pathname === "/v1/sessions",
 		);
 		// Bobert用のsigwのキーで呼び、費用を払う人(本人)を送る。SDKの anthropic-beta はそのまま届く
-		expect(sessionCall?.headers.get("x-api-key")).toBe("sgk-anthropic-test");
+		expect(sessionCall?.headers.get("x-api-key")).toBe(TEST_SIGW_KEY);
 		expect(sessionCall?.headers.get("x-sigw-user")).toBe(user.id);
 		expect(sessionCall?.headers.get("anthropic-beta")).toContain(
 			"managed-agents",

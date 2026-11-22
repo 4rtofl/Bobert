@@ -68,9 +68,10 @@
 
 返答などのAIの呼び出しと、エージェントと動画の作成(Managed Agents)は、sigw([4rtofl/si-gateway](https://github.com/4rtofl/si-gateway))を通す(仕組みは[LLM利用コスト](spec/llm-cost.md)「AIの呼び出しと費用の負担」を参照)。
 1. sigwのWorker(`sigw`)が、Bobertと同じCloudflareのアカウントで動いていることを確かめる。Bobertは、Service Bindingで、その`BobertGateway`の入口を呼ぶ(`wrangler.jsonc`の`services`)。開発用の環境も、同じ`sigw`を呼ぶ。
-2. sigwで、Bobert用のsigwのキーを、Anthropic用、OpenRouter用、TypeSafe用(Jev)に1つずつ発行する(`sgk_`で始まる)。個人トークンは要らない。誰の分かは、Bobertが呼び出しのたびに送る。
-3. 3つのキーを、シークレットに入れる: `SIGW_ANTHROPIC_KEY`、`SIGW_OPENROUTER_KEY`、`SIGW_TYPESAFE_KEY`。本番は`.env.production`に書き、手元は`.env`に書く。AnthropicかOpenRouterのキーを空にすると、そのプロバイダのモデルは使えない(AnthropicのキーがなければClaudeもOpenRouter経由で呼び、エージェントと動画の作成は使えない)。TypeSafeのキーを空にすると、「Jevに聞く」と`/jev`は使えない。
-4. Anthropic用のsigwのキーには、使えるモデルの制限を付けない。Managed Agentsのセッションを作る呼び出しやイベントの送信には`model`がなく、モデルを制限したキーでは、sigwに断られるため。使いすぎは、キーの上限額で防ぐ。
+2. sigwのWeb UIで、Bobert用のsigwのキーを1つ発行する(`sgk_`で始まる)。このキーで、Anthropic、OpenRouter、TypeSafe(Jev)のどれも呼ぶので、3つとも使えるようにしておく。個人トークンは要らない。誰の分かは、Bobertが呼び出しのたびに送る。
+3. Bobertをデプロイし、コマンドを登録した後に、DiscordでBobertを入れたサーバーの管理者が`/sigw`を使い、「sigwキーを登録」からキーを貼る。Bobertがsigwに問い合わせて、使えるキーなら、呼べるプロバイダを知らせる。キーはD1に暗号化して保存し、Bobertを入れたすべてのサーバーで使う。シークレットには入れない(以前の`SIGW_ANTHROPIC_KEY`、`SIGW_OPENROUTER_KEY`、`SIGW_TYPESAFE_KEY`は要らなくなった。残っていれば`wrangler secret delete`で消してよい)。開発用の環境では、開発用のBotで同じように登録する(D1が別なので)。
+   - 呼べないプロバイダがあると、そのプロバイダのモデルは使えない(Anthropicを呼べなければClaudeもOpenRouter経由で呼び、エージェントと動画の作成は使えない)。TypeSafeを呼べなければ、「Jevに聞く」と`/jev`は使えない。キーを登録するまでは、どのAIも呼べない。
+4. sigwのキーには、Anthropicで使えるモデルの制限を付けない。Managed Agentsのセッションを作る呼び出しやイベントの送信には`model`がなく、モデルを制限したキーでは、sigwに断られるため。使いすぎは、キーの上限額で防ぐ。
 5. sigwのキーのワークスペース(Bobert専用のワークスペース)に、エージェントと動画の作成のセッション、ファイル、vaultが作られる。キーの持ち主は、Claude Consoleで、その記録を読める(Bobertを使う3人で受け入れた。2026-11-22)。
 
 ## 手元の開発環境

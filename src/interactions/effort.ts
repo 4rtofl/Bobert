@@ -75,7 +75,7 @@ export function selectEffort(
 
 async function effortMenu(env: Env, userId: string): Promise<MessageEdit> {
 	const settings = await getUserSettings(env.DB, userId);
-	const resolution = resolveModel(settings, sigwProviders(env));
+	const resolution = resolveModel(settings, await sigwProviders(env));
 	if (!resolution.ok) {
 		return { content: modelUnavailableText(resolution), components: [] };
 	}
@@ -94,7 +94,7 @@ async function applyEffort(
 	value: string,
 ): Promise<MessageEdit> {
 	const settings = await getUserSettings(env.DB, userId);
-	const resolution = resolveModel(settings, sigwProviders(env));
+	const resolution = resolveModel(settings, await sigwProviders(env));
 	if (!resolution.ok) {
 		return { content: modelUnavailableText(resolution), components: [] };
 	}

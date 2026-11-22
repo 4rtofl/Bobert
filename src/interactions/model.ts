@@ -57,7 +57,7 @@ export async function modelCommand(
 	env: Env,
 	userId: string,
 ): Promise<APIInteractionResponse> {
-	const providers = sigwProviders(env);
+	const providers = await sigwProviders(env);
 	const settings = await getUserSettings(env.DB, userId);
 	return {
 		type: InteractionResponseType.ChannelMessageWithSource,
@@ -212,7 +212,7 @@ async function applyCandidate(
 	userId: string,
 	value: string,
 ): Promise<MessageEdit> {
-	const providers = sigwProviders(env);
+	const providers = await sigwProviders(env);
 	const settings = await getUserSettings(env.DB, userId);
 	const candidate = findModelCandidate(value);
 	if (!candidate) {
@@ -287,7 +287,7 @@ async function verifyAndSaveCustomModel(
 	}
 	const provider = customModelProvider(modelId);
 	const settings = await getUserSettings(env.DB, userId);
-	if (!sigwProviders(env).has(provider)) {
+	if (!(await sigwProviders(env)).has(provider)) {
 		return modelUnavailableText({
 			ok: false,
 			missing: provider,

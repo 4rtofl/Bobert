@@ -72,7 +72,7 @@ export async function agentSecretsCommand(
 	ctx: ExecutionContext,
 	userId: string,
 ): Promise<APIInteractionResponse> {
-	if (!agentsAvailable(env)) {
+	if (!(await agentsAvailable(env))) {
 		return ephemeral(AI_UNAVAILABLE_TEXT);
 	}
 	return respondLater(
@@ -137,7 +137,7 @@ export async function agentSecretsComponent(
 		}
 		case Action.Delete: {
 			const [id = "", name = ""] = values;
-			if (!agentsAvailable(env)) {
+			if (!(await agentsAvailable(env))) {
 				return ephemeral(AI_UNAVAILABLE_TEXT);
 			}
 			return respondLater(
@@ -196,7 +196,7 @@ export async function submitAgentSecretModal(
 		return ephemeral(INVALID_URL);
 	}
 	const value = readTextInput(interaction, VALUE_INPUT_ID) ?? "";
-	if (!agentsAvailable(env)) {
+	if (!(await agentsAvailable(env))) {
 		return ephemeral(AI_UNAVAILABLE_TEXT);
 	}
 	return respondLater(

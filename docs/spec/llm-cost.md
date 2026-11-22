@@ -22,16 +22,26 @@
   - Anthropicは`https://sigw/anthropic/v1/messages`のように、OpenRouterは`https://sigw/openrouter/api/v1/chat/completions`のように、sigwの中継のパスで呼ぶ。Service Bindingなので、ホスト名は使われない。
   - AnthropicのSDKは、送り先(`baseURL`)と`fetch`を差し替えて使う。
   - OpenRouterのモデル一覧は、キーがなくても読めるので、sigwを通さずに直接取る。
-- **キー:** Bobert用のsigwのキーを、Workerのシークレットに置く。Anthropic用が`SIGW_ANTHROPIC_KEY`、OpenRouter用が`SIGW_OPENROUTER_KEY`(Jevに使うTypeSafe用のキーは「Jevの費用」を参照)。Anthropicには`x-api-key`、OpenRouterには`Authorization: Bearer`で、sigwのキーだけを送る。Anthropicのキーはsigwの専用のワークスペースのものなので、ワークスペースのIDは送らない。
+- **キー:** Bobert用のsigwのキーは1つで、Anthropic、OpenRouter、TypeSafe(Jev)のどれも、このキーで呼ぶ。サーバー管理者が`/sigw`で登録する(#135。「sigwのキーの登録と保存」を参照)。Anthropicには`x-api-key`、OpenRouterとTypeSafeには`Authorization: Bearer`で、sigwのキーだけを送る。Anthropicのキーはsigwの専用のワークスペースのものなので、ワークスペースのIDは送らない。
 - **費用を払う人:** 返答を頼んだ人(メンションや返信をした人、ボタンやメニューを押した人)。呼び出しのたびに、その人のDiscordのIDを`x-sigw-user`ヘッダーで送る。sigwはこのIDごとに使った額を記録し、毎月まとめて精算する(Daichoo)。
   - 記憶のまとめは記憶の持ち主、知識チャンネルのファイルの要約はファイルを送った人が払う。
   - モデル情報の取得は無料だが、同じく頼んだ人のIDを送る。
   - エージェントはチャンネルの持ち主、動画の作成は動画を頼んだ人が払う。
-- **使えるモデル:** Bobertにあるsigwのキーで決まり、全員で同じ。両方のキーがあれば、Claudeの候補はAnthropicで直接呼び、ほかはOpenRouterで呼ぶ。`SIGW_ANTHROPIC_KEY`が空ならClaudeもOpenRouter経由で呼び、`SIGW_OPENROUTER_KEY`が空ならClaude以外は使えない。
+- **使えるモデル:** 登録したsigwのキーで呼べるプロバイダ(sigwに問い合わせた結果)で決まり、全員で同じ。AnthropicとOpenRouterの両方を呼べれば、Claudeの候補はAnthropicで直接呼び、ほかはOpenRouterで呼ぶ。Anthropicを呼べなければClaudeもOpenRouter経由で呼び、OpenRouterを呼べなければClaude以外は使えない。キーを登録していなければ、どのモデルも使えない。
 - **断られたとき:** sigw自身が断ったときは、プロバイダと同じ形のエラーで、文が「[sigw]」で始まる。この文は送った内容を含まないので、返答で、そのまま理由として見せる(例:「[sigw] sigw キーの今月の上限額に達しました」)。プロバイダが断ったときは、今までどおり、エラーの種類から理由を書く。
 - **OpenRouterに送る指定:** OpenRouterへのリクエストには、データを保存・学習しないプロバイダだけを使う指定(`provider.data_collection: "deny"`)を付ける。会話には他の人の発言も含まれるため。この指定により、使えなくなるモデルもある。
   - OpenRouterのモデル単価は各社と同額。クレジット購入時に手数料がかかる(約5.5%、最低$0.80。2026-10時点の第三者による解説)。
 - **使えなくなったとき:** Bobertのsigwのキーが無効になったときと、その先のアカウント(AnthropicかOpenRouter)の残高が足りなくなったときは、使う人には直せないので、「いまはAIを呼び出せません。Bobertの管理者に知らせてください。」と返す(キーがないときと同じ文)。
+
+## sigwのキーの登録と保存
+
+- **登録:** サーバー管理の権限を持つ人が、`/sigw`で登録する(画面は[Botの振る舞い](behavior.md)「sigwキーの登録」を参照)。キーはBobert全体で1つで、Bobertを入れたすべてのサーバーで使う。登録し直すと置き換わる。
+- **確かめ方:** 登録するときに、sigwの`GET https://sigw/sigw/key`を、キーを`x-api-key`に入れて呼ぶ(登録する人のDiscordのIDも`x-sigw-user`で送る)。sigwは、使えるキーなら末尾4文字と、呼べるプロバイダ(`{"last4":"abcd","providers":["anthropic","openrouter","typesafe"]}`)を返し、使えないキーなら401と、「[sigw]」で始まる文を返す。401なら保存せず、その文を見せる。
+- **保存:** `CREDENTIAL_ENCRYPTION_KEYS`の鍵で暗号化して(AES-256-GCM。GitHubのトークンと同じ方法)、D1(`sigw_key`。`migrations/0032_sigw_key.sql`)に1行だけ保存する。暗号文は「sigw_key」という持ち主に結び付ける。末尾4文字、登録したときに呼べたプロバイダ、登録した人のDiscordのID、登録した時刻も残す。キーはログに出さない。
+- **呼べるプロバイダ:** 呼び出しのたびには問い合わせない。D1のキーと、`/sigw/key`に問い合わせた結果を、Workerの実行環境(Durable Objectもそれぞれ)の中に1分覚えておき、過ぎたら読み直す。そのため、ほかの実行環境で登録し直したときは、1分以内に新しいキーに切り替わる。`/sigw`で登録した実行環境では、すぐに切り替わる。
+  - sigwに問い合わせられないとき(つながらない、401以外の失敗)は、前に問い合わせた結果で続ける。前の結果がなければ、登録したときに呼べたプロバイダで続ける。どちらのときも、10秒たったら問い合わせ直す。sigwが止まっていれば呼び出しも失敗するので、ここで呼べないことにはしない。
+  - 401が返ったら(キーが取り消されたなど)、どのプロバイダも呼べないものとして扱う。
+- **以前の形:** #134までは、プロバイダごとのsigwのキーを、Workerのシークレット(`SIGW_ANTHROPIC_KEY`、`SIGW_OPENROUTER_KEY`、`SIGW_TYPESAFE_KEY`)に置いていた。キーを1つにして、Discordから登録できるようにしたので、シークレットはなくした(2026-11-22に決めた)。
 
 ## キーの登録をやめたこと
 
@@ -142,7 +152,7 @@
 - **通り道:** エージェントの設定、環境、セッション、イベント(流れ、一覧、送信)、セッションの資源、ファイル、vaultのAPIを、すべてsigwの中継(`https://sigw/anthropic/v1/...`)で呼ぶ。中身は変えずに中継され、SDKが付ける`anthropic-beta`ヘッダーもそのまま届く。呼び出しのたびに、チャンネルの持ち主のDiscordのIDを`x-sigw-user`で送る。
 - **かかるもの:** トークン代(通常のAPIと同じ単価)と、セッションが動いている(`running`)間の1時間あたり$0.08。待っている(`idle`)間は数えない。コンテナの料金は別にかからない。Web検索を使えば、その料金もかかる。
   - セッションの料金は、セッションを作る応答やイベントの送信の応答には出てこない。sigwは、セッションを作る呼び出し(`POST /v1/sessions`)を中継したときに、そのセッションと`x-sigw-user`の人を記録し、定期的に(と、セッションを消す直前に)セッションの使用量の累計を読んで、増えた分(トークン代と実行時間の料金)をその人に付ける(4rtofl/si-gateway#7)。
-- **使える人:** 誰でも使える(本人のキーの登録は要らない)。Bobertに、Anthropic用のsigwのキー(`SIGW_ANTHROPIC_KEY`)が要る。Managed AgentsはAnthropicのAPIの機能なので、OpenRouterのキーだけでは使えない。sigwのキーがないときは、「いまはAIを呼び出せません。Bobertの管理者に知らせてください。」(返答と同じ文)と知らせる。
+- **使える人:** 誰でも使える(本人のキーの登録は要らない)。Bobertのsigwのキーで、Anthropicを呼べる必要がある。Managed AgentsはAnthropicのAPIの機能なので、OpenRouterしか呼べなければ使えない。呼べないときは、「いまはAIを呼び出せません。Bobertの管理者に知らせてください。」(返答と同じ文)と知らせる。
 - **上限:** Bot側では付けない。今の方針(Bot側では使用量の上限を設けない)に合わせる。Managed Agentsの、セッションごとの上限額の機能も使わない。上限額は、sigwのキーに設定できる。
 - **記録:** セッション、ファイル、vaultは、sigwのキーのワークスペース(Bobert専用のワークスペース)に作られる。セッションの記録(会話と作業の内容)は、消すまでそこに残る(ゼロデータ保持の対象外)。ワークスペースの持ち主(sigwのキーの持ち主)は、Claude Consoleで読める。本人は読めない。持ち主が読めることは、Bobertを使う3人で受け入れた(2026-11-22)。セッションを終えると消す。
   - 本人のアカウントで作っていたもの(#126より前のセッション、環境、vault)は、Bobertからは見えなくなる。続きの操作はできないので、新しく作り直す。本人のアカウントに残ったものは、本人がClaude Consoleで消せる。
@@ -156,7 +166,7 @@
 - **台本を書くAI:** 今の返答と同じく、返答を頼んだ人(動画を頼んだ人)の負担。会話と、発言に貼られたURLの先のページ(1回の返答で10件、1ページ10,000文字まで)を読む分、入力が増える。
 - **動画を作るサンドボックス:** エージェントと同じく、Managed AgentsのAPIをsigwを通して呼び、動画を頼んだ人のDiscordのIDを`x-sigw-user`で送る(#126)。運営者は負担しない。
   - かかるのは、セッションが動いている間の1時間あたり$0.08と、コマンドを実行させるClaude Haiku 5.5のトークン代。sigwが、エージェントと同じ仕組みで記録する。試作では、全体で約2分、1本あたり約$0.004だった(VOICEVOX ENGINEのダウンロード(約2GB)に約1分かかる。毎回ダウンロードする)。
-  - 誰でも使える(本人のキーの登録は要らない)。Bobertに、Anthropic用のsigwのキーが要る。
+  - 誰でも使える(本人のキーの登録は要らない)。Bobertのsigwのキーで、Anthropicを呼べる必要がある。
   - 上限はBot側では付けない(エージェントと同じ)。上限額は、sigwのキーに設定できる。
   - 台本のファイルは、Bobertのワークスペースのファイル(Files API)に上げてからサンドボックスに置く。動画を投稿したら(失敗したときも)、セッションと、上げたファイル、出したファイルを消す。それまでの記録は、エージェントと同じく、ワークスペースの持ち主がClaude Consoleで読める。
 - **運営者の費用:** 利用者ごとのDurable Objectが、作っている間だけ30秒ごとのアラームで動く(1本あたり数回〜30回)。有料プランに含まれる量の範囲内の見込み。
@@ -165,7 +175,7 @@
 
 右クリックメニューの「Jevに聞く」と`/jev`([Botの振る舞い](behavior.md)を参照)では、AIが作った質問を、TypeSafeの判定モデルJevに聞く。Jevも、返答と同じくsigwを通して呼び、費用は使った本人が払う。運営者は負担しない。
 - **通り道:** `https://sigw/typesafe/v1/systemone`を、Service Binding(`SIGW`)で呼ぶ。sigwが`https://api.typesafe.ai/v1/systemone`に中継する。
-- **キー:** TypeSafe用のBobertのsigwのキー(`SIGW_TYPESAFE_KEY`)を、Workerのシークレットに置き、`Authorization: Bearer`で送る。このキーが空なら、Jevは使えない。そのときは、AIを呼び出せないときと同じ文を本人にだけ見せる。利用者がTypeSafeのキーを登録する必要はない。
+- **キー:** Bobertのsigwのキー(返答と同じ1つのキー)を、`Authorization: Bearer`で送る。このキーでTypeSafeを呼べなければ(sigwに問い合わせた結果に`typesafe`がなければ)、Jevは使えない。そのときは、AIを呼び出せないときと同じ文を本人にだけ見せる。利用者がTypeSafeのキーを登録する必要はない。
 - **費用を払う人:** 使った人。返答と同じく、その人のDiscordのIDを`x-sigw-user`ヘッダーで送り、sigwが記録して毎月まとめて精算する。
 - **単価:** 入力100万トークンあたり$0.042で、出力は無料(2026-11-04時点、TypeSafeの資料)。1回の質問は数百〜数千トークンなので、$0.0001ほど。
 - **AIの費用:** 質問を作るAIの費用は、メンションへの返答と同じく、sigwを通して使った本人が払う。

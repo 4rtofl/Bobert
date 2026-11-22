@@ -441,11 +441,11 @@ export function agentEffort(
 }
 
 /**
- * エージェントと動画の作成を使えるか。Bobertに、Anthropicのsigwのキーがあれば使える(全員で同じ)。
- * Managed AgentsはClaudeでしか動かないので、OpenRouterのキーでは使えない
+ * エージェントと動画の作成を使えるか。Bobertのsigwのキーで、Anthropicを呼べれば使える(全員で同じ)。
+ * Managed AgentsはClaudeでしか動かないので、OpenRouterしか呼べなければ使えない
  */
-export function agentsAvailable(env: Env): boolean {
-	return sigwProviders(env).has("anthropic");
+export async function agentsAvailable(env: Env): Promise<boolean> {
+	return (await sigwProviders(env)).has("anthropic");
 }
 
 /**
