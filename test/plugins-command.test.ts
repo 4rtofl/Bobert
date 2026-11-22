@@ -590,7 +590,7 @@ describe("/plugins の reload", () => {
 	it("プラグインとスキルの今の一覧で、セッションのスキルを読む道具を差し替え、結果を書く", async () => {
 		const guildId = newGuild();
 		await installCodeReview(guildId);
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const channelId = await agentChannel(guildId, owner.id);
 		const calls = mockFetch((call) =>
 			call.url.hostname === "api.anthropic.com"

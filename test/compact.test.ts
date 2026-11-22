@@ -14,7 +14,6 @@ import { handleRespondJob } from "../src/respond/handler";
 import { fromDiscord } from "../src/respond/history";
 import { SUMMARY_SYSTEM_PROMPT } from "../src/respond/summary";
 import { saveMessages } from "../src/store/messages";
-import { saveCredential } from "../src/store/users";
 import {
 	ALICE,
 	BOT,
@@ -59,14 +58,9 @@ function fakeQueues() {
 	return { environment, sent };
 }
 
-/** Anthropicのキーを登録した人(既定のClaude Haiku 5.5をAnthropicで直接呼ぶ) */
-async function anthropicUser(id: string) {
-	const user = { ...ALICE, id };
-	await saveCredential(env, user.id, "anthropic", {
-		apiKey: "sk-ant-test",
-		workspaceId: null,
-	});
-	return user;
+/** 話しかける人(既定のClaude Haiku 5.5を、sigwを通してAnthropicで直接呼ぶ) */
+function userOf(id: string) {
+	return { ...ALICE, id };
 }
 
 /** 人(user)とBobertが交互に返信し合う会話。firstIdから続くIDで、count件 */
@@ -148,7 +142,7 @@ function respondJob(message: APIMessage): RespondJob {
 describe("要約を勧める案内", () => {
 	it("料金が上がる境目を超えたら、返答の末尾に案内と「今すぐ要約」ボタンを付ける。同じ会話では1回だけ", async () => {
 		const { environment } = fakeQueues();
-		const user = await anthropicUser("160");
+		const user = userOf("160");
 		const first = discordMessage("7400", user, `<@${BOT.id}> 長い話`, {
 			mentions: [BOT],
 		});
@@ -189,7 +183,7 @@ describe("要約を勧める案内", () => {
 
 	it("境目を超えなければ、案内を付けない", async () => {
 		const { environment } = fakeQueues();
-		const user = await anthropicUser("161");
+		const user = userOf("161");
 		const trigger = discordMessage("7410", user, `<@${BOT.id}> 短い話`, {
 			mentions: [BOT],
 		});
@@ -305,7 +299,7 @@ describe("要約の仕事", () => {
 	};
 
 	it("押した人のキーで要約して保存し、結果を見せて、案内のボタンを消す", async () => {
-		const user = await anthropicUser("170");
+		const user = userOf("170");
 		const messages = conversation(user, 7700, 25);
 		await saveMessages(
 			env.DB,
@@ -345,7 +339,7 @@ describe("要約の仕事", () => {
 	});
 
 	it("要約するほど長くなければ、要約せずにそう伝える", async () => {
-		const user = await anthropicUser("171");
+		const user = userOf("171");
 		const messages = conversation(user, 7800, 5);
 		await saveMessages(
 			env.DB,
@@ -385,7 +379,7 @@ describe("要約の仕事", () => {
 	});
 
 	it("AIに断られたら、そう伝えて、案内のボタンは残す", async () => {
-		const user = await anthropicUser("173");
+		const user = userOf("173");
 		const messages = conversation(user, 7950, 25);
 		await saveMessages(
 			env.DB,

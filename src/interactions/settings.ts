@@ -10,11 +10,7 @@ import {
 	selectedCandidate,
 } from "../respond/model";
 import { loadMemory } from "../store/memory";
-import {
-	getRegisteredProviders,
-	getUserSettings,
-	type UserSettings,
-} from "../store/users";
+import { getUserSettings, type UserSettings } from "../store/users";
 import { type MessageEdit, respondLater } from "./deferred";
 
 /** 自分用の指示を見せるときの長さの上限(文字数) */
@@ -51,16 +47,13 @@ async function settingsMessage(
 	userId: string,
 	guildId: string | undefined,
 ): Promise<MessageEdit> {
-	const [providers, settings, memory] = await Promise.all([
-		getRegisteredProviders(env.DB, userId),
+	const [settings, memory] = await Promise.all([
 		getUserSettings(env.DB, userId),
 		guildId === undefined ? null : loadMemory(env.DB, userId, guildId),
 	]);
-	// モデルは、Bobertにあるsigwのキーで呼ぶ。登録したキーの行は、登録の仕組みを外すまで残す
+	// モデルは、Bobertにあるsigwのキーで呼ぶ
 	const resolution = resolveModel(settings, sigwProviders(env));
 	const lines = [
-		`- Anthropic: ${providers.has("anthropic") ? "登録済み" : "未登録"}`,
-		`- OpenRouter: ${providers.has("openrouter") ? "連携済み" : "未連携"}`,
 		`- モデル: ${modelLine(settings, resolution)}`,
 		`- 思考の深さ: ${
 			resolution.ok
@@ -77,7 +70,7 @@ async function settingsMessage(
 	return { content: lines.join("\n"), components: [] };
 }
 
-/** 使うモデルと、その呼び出し先。キーが足りなければ、登録が必要だと書く */
+/** 使うモデルと、その呼び出し先。Bobertにsigwのキーがなくて呼べなければ、そう書く */
 function modelLine(
 	settings: UserSettings,
 	resolution: ModelResolution,

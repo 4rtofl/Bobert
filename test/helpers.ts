@@ -20,7 +20,6 @@ import {
 	saveBotRoles,
 	saveChannels,
 } from "../src/store/channels";
-import { type Provider, saveCredential } from "../src/store/users";
 import { ALICE, BOT } from "./fixtures";
 
 // テスト専用の秘密鍵(本物の秘密ではない)。
@@ -105,21 +104,12 @@ export async function sendInteraction(
 }
 
 /**
- * 資格情報を登録したユーザーを作る関数。呼ぶたびに別の人にする(IDはfirstIdから順に使う)。
+ * ユーザーを作る関数。呼ぶたびに別の人にする(IDはfirstIdから順に使う)。
  * テストのファイルごとに、ほかのファイルと重ならないfirstIdを使う。
  */
 export function userFactory(firstId: number) {
 	let nextId = firstId;
-	return async (...providers: Provider[]): Promise<APIUser> => {
-		const user = { ...ALICE, id: String(nextId++) };
-		for (const provider of providers) {
-			await saveCredential(env, user.id, provider, {
-				apiKey: `key-${provider}`,
-				workspaceId: null,
-			});
-		}
-		return user;
-	};
+	return (): APIUser => ({ ...ALICE, id: String(nextId++) });
 }
 
 /** sigw経由でAIを呼ぶ人(AIの呼び出しを直接試すテスト用) */

@@ -33,7 +33,7 @@ export type KnowledgeState = "pending" | "converted" | "ready" | "rejected";
 
 /** 知識に加えなかった理由(記録とログに残す) */
 export type KnowledgeRejection =
-	/** 送った人が、AIのキーを登録していない */
+	/** 要約のモデルを呼べない(Bobertにsigwのキーがない。#128より前は、送った人がキーを登録していない) */
 	| "no_key"
 	/** 大きすぎる(20MBを超える) */
 	| "too_large"
@@ -570,7 +570,7 @@ export async function rejectKnowledgeFile(
 
 /**
  * メッセージのうち、まだ知識に入っていないファイルを、まとめて知識に加えなかった(rejected)にする
- * (送った人がキーを登録していないとき。メッセージごとに1回だけ知らせるため)。変えたファイルを返す
+ * (要約のモデルを呼べないとき。メッセージごとに1回だけ知らせるため)。変えたファイルを返す
  */
 export async function rejectPendingKnowledgeFiles(
 	db: D1Database,

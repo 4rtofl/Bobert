@@ -20,7 +20,6 @@ import {
 	type ChatResult,
 	type ChatTool,
 	describeError,
-	type KeyCheckResult,
 	LlmError,
 	type LlmErrorKind,
 	type ModelCheckResult,
@@ -42,13 +41,6 @@ export const CLAUDE_EFFORTS = [
 
 function isClaudeEffort(value: string): value is Effort {
 	return (CLAUDE_EFFORTS as readonly string[]).includes(value);
-}
-
-/** ユーザーが登録したAnthropicの資格情報(/setup の確認でだけ使う。呼び出しはすべてsigwを通す。登録の仕組みは#128で見直す) */
-export interface AnthropicCredential {
-	apiKey: string;
-	/** キーがワークスペースに属さないとき(個人キーなど)に使うワークスペースのID */
-	workspaceId: string | null;
 }
 
 /** 検索結果を絞り込む、新しい版のWeb検索を使えるClaude。ほかのClaudeは、古い版を使う */
@@ -338,39 +330,6 @@ function sourcesOf(blocks: readonly Anthropic.ContentBlock[]): Source[] {
 	return [...sources.values()];
 }
 
-/** キーが有効か確かめる。料金のかからない、モデル一覧のAPIを呼ぶ */
-export async function checkAnthropicKey(
-	credential: AnthropicCredential,
-): Promise<KeyCheckResult> {
-	const client = createClient(credential, 1);
-	try {
-		await client.models.list({ limit: 1 });
-		return { status: "valid" };
-	} catch (error) {
-		if (
-			error instanceof Anthropic.AuthenticationError ||
-			error instanceof Anthropic.PermissionDeniedError
-		) {
-			return { status: "invalid" };
-		}
-		// このリクエストに誤りが入る余地はないので、400はワークスペースの指定が原因になる。
-		// ワークスペースに属さないキーでIDがないか、入力されたIDの形が正しくない
-		if (error instanceof Anthropic.BadRequestError) {
-			return credential.workspaceId === null
-				? { status: "needs_workspace" }
-				: { status: "workspace_not_found" };
-		}
-		// 入力されたワークスペースが存在しないか、このキーでは使えない
-		if (
-			error instanceof Anthropic.NotFoundError &&
-			credential.workspaceId !== null
-		) {
-			return { status: "workspace_not_found" };
-		}
-		return { status: "unavailable", detail: describeError(error) };
-	}
-}
-
 /**
  * 「その他」で入力されたClaudeのモデルを、sigw経由で使えるか確かめる。
  * 料金のかからない、モデルの情報のAPIを呼ぶ。選べる思考の深さも、モデルの情報から取り出す。
@@ -423,25 +382,6 @@ function claudeEfforts(
 		return [];
 	}
 	return CLAUDE_EFFORTS.filter((level) => effort[level]?.supported === true);
-}
-
-/**
- * ユーザーが登録したキーで、SDKのクライアントを作る(/setup のキーの確認でだけ使う)。
- * ワークスペースに属さないキーでは、使うワークスペースのIDをリクエストのたびにヘッダーで送る。
- */
-export function createClient(
-	credential: AnthropicCredential,
-	maxRetries?: number,
-): Anthropic {
-	return new Anthropic({
-		apiKey: credential.apiKey,
-		...(maxRetries === undefined ? {} : { maxRetries }),
-		...(credential.workspaceId === null
-			? {}
-			: {
-					defaultHeaders: { "anthropic-workspace-id": credential.workspaceId },
-				}),
-	});
 }
 
 function toMessageParam(message: ChatMessage): Anthropic.MessageParam {

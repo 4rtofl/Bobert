@@ -188,7 +188,7 @@ describe("エージェントのチャンネルのDurable Object", () => {
 	});
 
 	it("添付ファイルを、Bobertのワークスペースに上げてサンドボックスに置き、置き場所を書いて送る", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const channelId = "62103";
 		const stub = await startedChannel(channelId, owner.id);
 		const calls = mockFetch((call: FetchCall) => {
@@ -273,7 +273,7 @@ describe("エージェントのチャンネルのDurable Object", () => {
 	});
 
 	it("PRの確認で「作る」を押すと、本人のトークンでPRを作り、結果をエージェントに返して、作業を続ける", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const channelId = "62104";
 		const stub = await startedChannel(channelId, owner.id, true);
 		await saveGitHubLink(env, owner.id, {
@@ -426,7 +426,7 @@ describe("エージェントのチャンネルのDurable Object", () => {
 	});
 
 	it("GitHubの操作の確認で「実行する」を押すと、本人のトークンで書き込み、結果をエージェントに返して、作業を続ける", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const channelId = "62105";
 		const stub = await startedChannel(channelId, owner.id, true);
 		await saveGitHubLink(env, owner.id, {
@@ -581,7 +581,7 @@ describe("エージェントのチャンネルのDurable Object", () => {
 	});
 
 	it("本人以外の発言は消し、その人をメンションして知らせる", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const channelId = "62102";
 		const stub = await startedChannel(channelId, owner.id);
 		const calls = mockApis([]);
@@ -610,7 +610,7 @@ describe("エージェントのチャンネルのDurable Object", () => {
 		).toBe(false);
 	});
 	it("/plugins の reload で、スキルを読む道具を今の一覧で差し替え、次の発言に一覧を指示として足して送る", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const channelId = "62106";
 		const stub = await startedChannel(channelId, owner.id);
 		await addSkill(

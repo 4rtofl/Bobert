@@ -1,7 +1,7 @@
 import { AI_UNAVAILABLE_TEXT, sigwProviders } from "../llm/sigw";
 import type { ChatResult, LlmError } from "../llm/types";
 import { MEMORY_UPDATED_NOTE } from "../memory/texts";
-import type { Provider, UserSettings } from "../store/users";
+import type { UserSettings } from "../store/users";
 import { stripReplyHeader } from "./conversation";
 import {
 	type ModelResolution,
@@ -76,16 +76,13 @@ export function describeLlmError(
 	if (error.sigwMessage !== null) {
 		return error.sigwMessage;
 	}
-	const anthropic = model.provider === "anthropic";
 	switch (error.kind) {
+		// Bobertのsigwのキーか、その先のアカウントの問題なので、使う人には直せない
 		case "invalid_key":
-			return invalidKeyMessage(model.provider);
 		case "insufficient_credit":
-			return anthropic
-				? "Anthropicの残高が不足しています。Claude Consoleでクレジットを追加してください。"
-				: "OpenRouterの残高が不足しています。OpenRouterでクレジットを追加してください。";
+			return AI_UNAVAILABLE_TEXT;
 		case "forbidden":
-			return "このキーではモデルを使えないか、提供元に内容を断られました。";
+			return "このモデルを使えないか、提供元に内容を断られました。";
 		case "model_not_found":
 			return modelNotFoundText(model.label);
 		case "no_provider":
@@ -100,13 +97,6 @@ export function describeLlmError(
 		case "unknown":
 			return LLM_ERROR_TEXT;
 	}
-}
-
-/** 登録したキー(OpenRouterとの連携)が無効になっているときの案内 */
-export function invalidKeyMessage(provider: Provider): string {
-	return provider === "anthropic"
-		? "AnthropicのAPIキーが無効です。`/setup` から登録し直してください。"
-		: "OpenRouterとの連携が無効になっています。`/setup` から連携し直してください。";
 }
 
 /** 返答に添える注記 */

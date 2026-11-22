@@ -15,7 +15,6 @@ import { handleRespondJob } from "../src/respond/handler";
 import { fromDiscord } from "../src/respond/history";
 import { saveExplainTarget } from "../src/store/explain";
 import { saveMessages } from "../src/store/messages";
-import { saveCredential } from "../src/store/users";
 import {
 	ALICE,
 	at,
@@ -58,15 +57,6 @@ function fakeQueues() {
 		RESPOND_QUEUE: queue,
 	};
 	return { environment, sent };
-}
-
-/** Anthropicのキーを登録した人(既定のClaude Haiku 5.5をAnthropicで直接呼ぶ) */
-async function anthropicUser(user: typeof ALICE) {
-	await saveCredential(env, user.id, "anthropic", {
-		apiKey: "sk-ant-test",
-		workspaceId: null,
-	});
-	return user;
 }
 
 /**
@@ -146,9 +136,9 @@ describe("右クリックメニューの「Bobertに聞く」", () => {
 		);
 	});
 
-	it("キーを登録していれば、チャンネルに見える保留の応答を返し、説明の仕事を入れる", async () => {
+	it("AIを呼び出せれば、チャンネルに見える保留の応答を返し、説明の仕事を入れる", async () => {
 		const { environment, sent } = fakeQueues();
-		const user = await anthropicUser({ ...BOB, id: "180" });
+		const user = { ...BOB, id: "180" };
 		const target = discordMessage("8000", ALICE, "おはよう、元気?");
 
 		const body = await sendInteraction(
@@ -212,7 +202,7 @@ describe("右クリックメニューの「Bobertに聞く」", () => {
 describe("説明の仕事", () => {
 	it("説明するメッセージと、頼んだ人の依頼をAIに渡し、保留の応答を書き換えて投稿する", async () => {
 		const { environment } = fakeQueues();
-		const user = await anthropicUser({ ...BOB, id: "182" });
+		const user = { ...BOB, id: "182" };
 		const target = discordMessage("8020", ALICE, "おはよう、元気?");
 		const calls = mockApis([], () =>
 			anthropicStreamOf([{ type: "text", text: "朝のあいさつだよ" }]),
@@ -274,7 +264,7 @@ describe("説明の仕事", () => {
 
 	it("説明するメッセージが返信なら、返信先を読む道具を渡す(返信のつながりは最初から渡さない)", async () => {
 		const { environment } = fakeQueues();
-		const user = await anthropicUser({ ...BOB, id: "183" });
+		const user = { ...BOB, id: "183" };
 		const parent = discordMessage("8030", ALICE, "明日の集まり、何時から?");
 		const target = discordReply("8031", BOB, "いつもどおり", parent);
 		const calls = mockApis([parent], () =>
@@ -301,7 +291,7 @@ describe("説明の仕事", () => {
 
 	it("長い説明は分けて、2通目からは前のメッセージへの返信にする。同じ仕事は2回投稿しない", async () => {
 		const { environment } = fakeQueues();
-		const user = await anthropicUser({ ...BOB, id: "184" });
+		const user = { ...BOB, id: "184" };
 		const target = discordMessage("8040", ALICE, "長い話");
 		const longText = `${"あ".repeat(1500)}\n\n${"い".repeat(1500)}`;
 		const calls = mockApis([], () =>
@@ -331,7 +321,7 @@ describe("説明の仕事", () => {
 describe("説明に返信して、会話を続ける", () => {
 	it("説明の返答をたどった先に、説明の対象のメッセージを入れる(その返信先まではたどらない)", async () => {
 		const { environment } = fakeQueues();
-		const user = await anthropicUser({ ...BOB, id: "185" });
+		const user = { ...BOB, id: "185" };
 		const parent = discordMessage("8050", BOB, "明日の集まり、何時から?");
 		const target = discordReply("8051", ALICE, "いつもどおり", parent);
 		// 「Bobertに聞く」の返答は、返信ではない(右クリックメニューのコマンドへの返答)

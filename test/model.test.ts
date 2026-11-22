@@ -5,7 +5,7 @@ import { DEFAULT_USER_SETTINGS, type Provider } from "../src/store/users";
 const providers = (...names: Provider[]) => new Set(names);
 
 describe("使うモデルと呼び出し先の決定", () => {
-	it("キーを登録していなければ、登録を案内する", () => {
+	it("sigwのキーがどれもなければ、呼べない", () => {
 		expect(resolveModel(DEFAULT_USER_SETTINGS, providers())).toEqual({
 			ok: false,
 			missing: "credentials",

@@ -171,7 +171,7 @@ export function sessionFailed(reason: string): string {
 
 /** セッションを操作できない(sigw経由に替える前に、本人のアカウントで始めたセッションなど) */
 export const KEY_CANNOT_OPERATE =
-	"このキーでは、このセッションを操作できません。";
+	"このセッションは、Bobertからは操作できません。";
 
 export const NOT_AGENT_CHANNEL =
 	"このコマンドは、エージェントのチャンネルの中で使ってください。";

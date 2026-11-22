@@ -35,7 +35,7 @@ import {
 	savePendingSource,
 	updateSkill,
 } from "../src/store/skills";
-import { saveCredential, updateUserSettings } from "../src/store/users";
+import { updateUserSettings } from "../src/store/users";
 import { ALICE, BOT, CHANNEL_ID, discordMessage } from "./fixtures";
 import {
 	anthropicStreamOf,
@@ -794,13 +794,8 @@ describe("返答でスキルを使う", () => {
 		return String(nextMessageId++);
 	}
 
-	async function userWith(provider: "anthropic" | "openrouter") {
-		const user = { ...ALICE, id: newMessageId() };
-		await saveCredential(env, user.id, provider, {
-			apiKey: `key-${provider}`,
-			workspaceId: null,
-		});
-		return user;
+	function newUser() {
+		return { ...ALICE, id: newMessageId() };
 	}
 
 	function mention(user: typeof ALICE, text: string): APIMessage {
@@ -884,7 +879,7 @@ describe("返答でスキルを使う", () => {
 		const guildId = newGuild();
 		await addSkill(env.DB, guildId, MEETING_NOTES, BOB);
 		await addSkill(env.DB, guildId, TRPG_RULES, BOB);
-		const user = await userWith("openrouter");
+		const user = newUser();
 		await updateUserSettings(env.DB, user.id, { customPrompt: "敬語で答えて" });
 		const trigger = mention(user, "議事録にまとめて");
 		let round = 0;
@@ -933,7 +928,7 @@ describe("返答でスキルを使う", () => {
 		const guildId = newGuild();
 		await addSkill(env.DB, guildId, MEETING_NOTES, BOB);
 		await addSkill(env.DB, guildId, TRPG_RULES, BOB);
-		const user = await userWith("anthropic");
+		const user = newUser();
 		const trigger = mention(user, "TRPGの議事録を書いて");
 		let round = 0;
 		const calls = mockApis(trigger, () =>
@@ -999,7 +994,7 @@ describe("返答でスキルを使う", () => {
 			BOB,
 			{ overwrite: false },
 		);
-		const user = await userWith("openrouter");
+		const user = newUser();
 		const trigger = mention(user, "こんにちは");
 		const calls = mockApis(trigger, () => openRouterChat("こんにちは!"));
 
@@ -1019,7 +1014,7 @@ describe("返答でスキルを使う", () => {
 	});
 
 	it("スキルがないサーバーでは、一覧も道具も渡さない", async () => {
-		const user = await userWith("openrouter");
+		const user = newUser();
 		const trigger = mention(user, "こんにちは");
 		const calls = mockApis(trigger, () => openRouterChat("こんにちは!"));
 
@@ -1047,7 +1042,7 @@ describe("返答でスキルを使う", () => {
 	it("道具を使えないモデルには、スキルの一覧も道具も渡さず、注記もしない", async () => {
 		const guildId = newGuild();
 		await addSkill(env.DB, guildId, MEETING_NOTES, BOB);
-		const user = await userWith("openrouter");
+		const user = newUser();
 		await updateUserSettings(env.DB, user.id, {
 			modelKey: "custom",
 			customModelId: "x-ai/old-model",

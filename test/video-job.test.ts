@@ -177,7 +177,7 @@ function anthropicCalls(calls: FetchCall[], method: string, path: string) {
 
 describe("動画の仕事のDurable Object", () => {
 	it("1人1本まで。仕事があれば、次は受けない", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		mockApis({ status: "running", events: [], outputs: [] });
 		const stub = await startedJob(owner.id);
 
@@ -236,7 +236,7 @@ describe("動画の仕事のDurable Object", () => {
 	});
 
 	it("動画ができたら、頼んだメッセージへの返信として投稿し、セッションと記録を消す", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		mockApis({ status: "running", events: [], outputs: [] });
 		const stub = await startedJob(owner.id);
 		await settled(stub, owner.id);
@@ -291,7 +291,7 @@ describe("動画の仕事のDurable Object", () => {
 	});
 
 	it("動画が10MBを超えて止まったら、大きさを知らせる", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		mockApis({ status: "running", events: [], outputs: [] });
 		const stub = await startedJob(owner.id);
 		await settled(stub, owner.id);
@@ -328,7 +328,7 @@ describe("動画の仕事のDurable Object", () => {
 	});
 
 	it("動画がなく、理由も分からなければ、失敗を知らせる", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		mockApis({ status: "running", events: [], outputs: [] });
 		const stub = await startedJob(owner.id);
 		await settled(stub, owner.id);
@@ -354,7 +354,7 @@ describe("動画の仕事のDurable Object", () => {
 	});
 
 	it("手順を送る前の止まった状態は、終わったとみなさない", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		mockApis({ status: "running", events: [], outputs: [] });
 		const stub = await startedJob(owner.id);
 		await settled(stub, owner.id);
@@ -379,7 +379,7 @@ describe("動画の仕事のDurable Object", () => {
 	});
 
 	it("15分たってもできなければ、セッションを消して知らせる", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const calls = mockApis({ status: "running", events: [], outputs: [] });
 		const stub = await startedJob(owner.id, Date.now() - 16 * 60 * 1000);
 
@@ -392,7 +392,7 @@ describe("動画の仕事のDurable Object", () => {
 	});
 
 	it("/delete で消すときは、知らせを出さずに記録を消す", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const calls = mockApis({ status: "running", events: [], outputs: [] });
 		const stub = await startedJob(owner.id);
 

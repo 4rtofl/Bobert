@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import type { APIAttachment, APIMessage } from "discord-api-types/v10";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearModelInfoCache } from "../src/llm/model-info";
+import { AI_UNAVAILABLE_TEXT } from "../src/llm/sigw";
 import type {
 	QueueMessage,
 	RespondJob,
@@ -11,7 +12,7 @@ import { handleRespondJob } from "../src/respond/handler";
 import { fromDiscord } from "../src/respond/history";
 import { COMMON_SYSTEM_PROMPT } from "../src/respond/prompt";
 import { saveMessages } from "../src/store/messages";
-import { saveCredential, updateUserSettings } from "../src/store/users";
+import { updateUserSettings } from "../src/store/users";
 import {
 	ALICE,
 	at,
@@ -280,12 +281,8 @@ describe("メンションと返信への応答", () => {
 		expect(posted(calls).map((reply) => reply.content)).toEqual(["元気だよ!"]);
 	});
 
-	it("登録したキーがあっても、sigwのキーで呼び、ワークスペースは指定しない", async () => {
+	it("sigwのキーで呼び、ワークスペースは指定しない", async () => {
 		const user = { ...ALICE, id: "113" };
-		await saveCredential(env, user.id, "anthropic", {
-			apiKey: "sk-ant-usr-test",
-			workspaceId: "wrkspc_01TEST",
-		});
 		const trigger = discordMessage("5040", user, `<@${BOT.id}> こんにちは`, {
 			mentions: [BOT],
 		});
@@ -303,10 +300,6 @@ describe("メンションと返信への応答", () => {
 
 	it("自分用の指示を、共通の指示の後ろに並べてAIに渡す", async () => {
 		const user = { ...ALICE, id: "116" };
-		await saveCredential(env, user.id, "anthropic", {
-			apiKey: "sk-ant-test",
-			workspaceId: null,
-		});
 		await updateUserSettings(env.DB, user.id, {
 			customPrompt: "敬語で答えて",
 		});
@@ -330,10 +323,6 @@ describe("メンションと返信への応答", () => {
 
 	it("AIが返答に書いた人へのメンションでは、その人に通知する", async () => {
 		const user = { ...ALICE, id: "129" };
-		await saveCredential(env, user.id, "anthropic", {
-			apiKey: "sk-ant-test",
-			workspaceId: null,
-		});
 		const trigger = discordMessage(
 			"5025",
 			user,
@@ -356,10 +345,6 @@ describe("メンションと返信への応答", () => {
 
 	it("話しかけたメッセージの返信先が削除されていたら、そのことをAIに伝える", async () => {
 		const user = { ...ALICE, id: "131" };
-		await saveCredential(env, user.id, "anthropic", {
-			apiKey: "sk-ant-test",
-			workspaceId: null,
-		});
 		// 返信先は、Discordにも保存分にもない
 		const deleted = discordMessage("5026", BOB, "消された発言");
 		const trigger = discordReply(
@@ -383,10 +368,6 @@ describe("メンションと返信への応答", () => {
 
 	it("長い返答は分けて投稿し、2通目からは前の返信につなげる", async () => {
 		const user = { ...ALICE, id: "111" };
-		await saveCredential(env, user.id, "anthropic", {
-			apiKey: "sk-ant-test",
-			workspaceId: null,
-		});
 		const trigger = discordMessage("5020", user, `<@${BOT.id}> 長く話して`, {
 			mentions: [BOT],
 		});
@@ -406,7 +387,7 @@ describe("メンションと返信への応答", () => {
 		expect(replies[1]?.allowed_mentions.replied_user).toBe(false);
 	});
 
-	it("OpenRouterの残高が足りないときは、理由を返信する", async () => {
+	it("OpenRouterの残高が足りないときは、管理者に知らせるよう返信する", async () => {
 		const user = { ...ALICE, id: "112" };
 		const trigger = discordMessage("5030", user, `<@${BOT.id}> こんにちは`, {
 			mentions: [BOT],
@@ -429,7 +410,7 @@ describe("メンションと返信への応答", () => {
 			"Bearer sgk-openrouter-test",
 		);
 		expect(request?.headers.get("x-sigw-user")).toBe(user.id);
-		expect(posted(calls)[0]?.content).toContain("OpenRouterの残高が不足");
+		expect(posted(calls)[0]?.content).toContain(AI_UNAVAILABLE_TEXT);
 	});
 
 	it("sigwが断ったときは、sigwの文を、そのまま理由として返信する", async () => {
@@ -482,10 +463,6 @@ describe("メンションと返信への応答", () => {
 
 	it("「その他」で選んだOpenRouterのモデルが画像を読めるなら、画像を渡す", async () => {
 		const user = { ...ALICE, id: "114" };
-		await saveCredential(env, user.id, "openrouter", {
-			apiKey: "sk-or-test",
-			workspaceId: null,
-		});
 		await updateUserSettings(env.DB, user.id, {
 			modelKey: "custom",
 			customModelId: "x-ai/grok-4.7-mini",
@@ -523,10 +500,6 @@ describe("メンションと返信への応答", () => {
 
 	it("「その他」で選んだOpenRouterのモデルが画像を読めないなら、本文だけで答えて一言添える", async () => {
 		const user = { ...ALICE, id: "115" };
-		await saveCredential(env, user.id, "openrouter", {
-			apiKey: "sk-or-test",
-			workspaceId: null,
-		});
 		await updateUserSettings(env.DB, user.id, {
 			modelKey: "custom",
 			customModelId: "z-ai/glm-5.3",
@@ -562,10 +535,6 @@ describe("メンションと返信への応答", () => {
 
 	it("添付ファイルに番号を付けて渡し、AIがファイルを読む道具で読んだら、PDFをそのまま渡す", async () => {
 		const user = { ...ALICE, id: "128" };
-		await saveCredential(env, user.id, "anthropic", {
-			apiKey: "sk-ant-test",
-			workspaceId: null,
-		});
 		const pdfUrl = "https://cdn.discordapp.com/attachments/800/2/report.pdf";
 		const trigger = discordMessage("5160", user, `<@${BOT.id}> 要約して`, {
 			mentions: [BOT],
@@ -629,10 +598,6 @@ describe("メンションと返信への応答", () => {
 
 	it("思考の深さを設定していなければ、既定のlowを送る", async () => {
 		const user = { ...ALICE, id: "120" };
-		await saveCredential(env, user.id, "anthropic", {
-			apiKey: "sk-ant-test",
-			workspaceId: null,
-		});
 		const trigger = discordMessage("5080", user, `<@${BOT.id}> こんにちは`, {
 			mentions: [BOT],
 		});
@@ -651,10 +616,6 @@ describe("メンションと返信への応答", () => {
 
 	it("既定のlowを選べないモデルでは、いちばん近い段階を送る", async () => {
 		const user = { ...ALICE, id: "121" };
-		await saveCredential(env, user.id, "openrouter", {
-			apiKey: "sk-or-test",
-			workspaceId: null,
-		});
 		await updateUserSettings(env.DB, user.id, { modelKey: "mistral-large-4" });
 		const trigger = discordMessage("5090", user, `<@${BOT.id}> こんにちは`, {
 			mentions: [BOT],
@@ -685,10 +646,6 @@ describe("メンションと返信への応答", () => {
 
 	it("利用量の表示をONにしていれば、返答の末尾にトークン数と費用を添える", async () => {
 		const user = { ...ALICE, id: "122" };
-		await saveCredential(env, user.id, "anthropic", {
-			apiKey: "sk-ant-test",
-			workspaceId: null,
-		});
 		await updateUserSettings(env.DB, user.id, { featUsageDisplay: true });
 		const trigger = discordMessage("5100", user, `<@${BOT.id}> こんにちは`, {
 			mentions: [BOT],
@@ -840,10 +797,6 @@ describe("メンションと返信への応答", () => {
 
 	it("Web検索を使えないモデルでは、検索せずに答え、一言添える", async () => {
 		const user = { ...ALICE, id: "125" };
-		await saveCredential(env, user.id, "openrouter", {
-			apiKey: "sk-or-test",
-			workspaceId: null,
-		});
 		await updateUserSettings(env.DB, user.id, {
 			featWebSearch: true,
 			modelKey: "custom",
@@ -983,13 +936,8 @@ describe("メンションと返信への応答", () => {
 });
 
 describe("保存したメッセージから会話を読む", () => {
-	async function anthropicUser(id: string) {
-		const user = { ...ALICE, id };
-		await saveCredential(env, user.id, "anthropic", {
-			apiKey: "sk-ant-test",
-			workspaceId: null,
-		});
-		return user;
+	function userOf(id: string) {
+		return { ...ALICE, id };
 	}
 
 	function anthropicBody(calls: FetchCall[]) {
@@ -998,7 +946,7 @@ describe("保存したメッセージから会話を読む", () => {
 	}
 
 	it("保存したメッセージから会話を読み、返信先はDiscordに問い合わせない", async () => {
-		const user = await anthropicUser("140");
+		const user = userOf("140");
 		const first = discordMessage("5400", user, `<@${BOT.id}> やあ`, {
 			mentions: [BOT],
 		});
@@ -1028,7 +976,7 @@ describe("保存したメッセージから会話を読む", () => {
 	});
 
 	it("保存していない返信先はDiscordから読み、保存用のQueueに入れる", async () => {
-		const user = await anthropicUser("141");
+		const user = userOf("141");
 		const first = discordMessage("5410", user, `<@${BOT.id}> やあ`, {
 			mentions: [BOT],
 		});
@@ -1048,7 +996,7 @@ describe("保存したメッセージから会話を読む", () => {
 	});
 
 	it("名前は、サーバーで見えている名前に揃える", async () => {
-		const user = await anthropicUser("142");
+		const user = userOf("142");
 		const bob = { ...BOB, id: "143" };
 		const greeting = discordMessage("5420", bob, "やあ");
 		// Bobの名前は、前に保存したメッセージで分かっている
@@ -1148,10 +1096,6 @@ describe("音声メッセージ", () => {
 
 	it("Bobertの返答への音声メッセージの返信を、文字にしてAIに渡し、聞き取った内容を返答の末尾に添える", async () => {
 		const user = { ...ALICE, id: "190" };
-		await saveCredential(env, user.id, "anthropic", {
-			apiKey: "sk-ant-test",
-			workspaceId: null,
-		});
 		const first = discordMessage("5900", user, `<@${BOT.id}> やあ`, {
 			mentions: [BOT],
 		});

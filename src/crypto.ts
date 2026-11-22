@@ -1,9 +1,9 @@
 /**
  * 暗号まわりの小さな道具。
- * 資格情報(APIキー)の暗号化の仕様: docs/spec/llm-cost.md「資格情報の登録・保存・削除」
+ * GitHubのトークンの暗号化の仕様: docs/spec/llm-cost.md「GitHubのトークンの保存と削除」
  */
 
-/** 暗号化した資格情報(D1のcredentialsテーブルの1行分) */
+/** 暗号化した秘密(D1のgithub_linksテーブルの、トークン1つ分) */
 export interface EncryptedSecret {
 	/** 暗号化に使った鍵の番号 */
 	keyVersion: number;

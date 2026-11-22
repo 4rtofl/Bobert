@@ -14,7 +14,7 @@ export const MEMORY_OFF_TITLE = "**記憶**: OFF";
 export const MEMORY_OFF_EXPLANATION =
 	"ONにすると、このサーバーでのあなたの発言から、AIが「あなたについて覚えておくこと」をまとめて、あなたへの返答に使います。会話で「覚えて」「忘れて」と頼むこともできます。";
 export const MEMORY_COST_NOTE =
-	"-# まとめる費用は、あなたのキーにかかります(Claude Haiku 5.5。最初は発言5,000件ごとに3セントほど)。";
+	"-# まとめる費用は、あなたが払います(Claude Haiku 5.5。最初は発言5,000件ごとに3セントほど)。";
 /** 一覧を残したままOFFにしているとき、最後に足す行 */
 export const MEMORY_KEPT_NOTE =
 	"-# 一覧は残しています。ONに戻すと、また使います。";

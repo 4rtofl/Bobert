@@ -73,8 +73,8 @@ afterEach(() => {
 /** guildInteractionのサーバー */
 const GUILD_ID = "900";
 
-/** 資格情報を登録した、新しいユーザー(テストごとに別の人にする) */
-const userWith = userFactory(64000);
+/** 新しいユーザー(テストごとに別の人にする) */
+const newUser = userFactory(64000);
 
 /** 応答用と保存用のQueueの偽物。入れた仕事を記録する */
 function fakeQueues() {
@@ -163,7 +163,7 @@ function item(
 
 /** 一覧を作り終えた、記憶を使っている人 */
 async function enabledUser(items: MemoryItem[] = [], readUntil = 1) {
-	const user = await userWith("anthropic");
+	const user = await newUser();
 	await setMemoryEnabled(env.DB, user.id, GUILD_ID, true);
 	await saveMemoryItems(env.DB, user.id, GUILD_ID, items);
 	await recordMemoryUpdated(env.DB, user.id, GUILD_ID, readUntil, 1);
@@ -172,7 +172,7 @@ async function enabledUser(items: MemoryItem[] = [], readUntil = 1) {
 
 describe("/memory の画面", () => {
 	it("OFFのときは、何をする機能かと費用を、本人にだけ見せ、「ONにする」ボタンを付ける", async () => {
-		const user = await userWith("anthropic");
+		const user = await newUser();
 
 		const body = await sendInteraction(memoryCommand(user));
 
@@ -240,7 +240,7 @@ describe("/memory の画面", () => {
 	});
 
 	it("Bobertにsigwのキーがなければ、「ONにする」を押しても、ONにしない", async () => {
-		const user = await userWith();
+		const user = await newUser();
 
 		const body = await sendInteraction(
 			pressButton(user, "memory:on"),
@@ -256,7 +256,7 @@ describe("/memory の画面", () => {
 
 	it("「ONにする」を初めて押したら、最初の一覧を作る仕事を入れ、画面を「まとめています」にする", async () => {
 		const { environment, sent } = fakeQueues();
-		const user = await userWith("openrouter");
+		const user = await newUser();
 
 		const body = await sendInteraction(
 			pressButton(user, "memory:on"),
@@ -494,7 +494,7 @@ describe("記憶をまとめる仕事", () => {
 	}
 
 	it("最初は、いちばん古い発言から本人の発言とBobertの答えを読み、AIの変更を当てて保存する。ONにした画面を、一覧に書き換える", async () => {
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		await setMemoryEnabled(env.DB, user.id, GUILD_ID, true);
 		const first = stored(user.id, "Rustでゲームを作ってる", 1_000);
 		const answer = stored(BOT.id, "いいね!", 1_500, first.messageId);
@@ -549,7 +549,7 @@ describe("記憶をまとめる仕事", () => {
 
 	it("1回で読む発言の数には上限があり、残りがあれば、続きを読む仕事を入れる。ONにした画面は、読み終えたときに書き換える", async () => {
 		const { environment, sent } = fakeQueues();
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		await setMemoryEnabled(env.DB, user.id, GUILD_ID, true);
 		await saveMessages(env.DB, [
 			stored(user.id, "いちばん古い発言", 1_000),
@@ -653,7 +653,7 @@ describe("記憶をまとめる仕事", () => {
 	});
 
 	it("AIの呼び出しに失敗したら、理由を記録し、読み込んだ時刻は進めない", async () => {
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		await setMemoryEnabled(env.DB, user.id, GUILD_ID, true);
 		await saveMessages(env.DB, [stored(user.id, "発言", 1_000)]);
 		const calls = mockFetch((call) =>
@@ -674,8 +674,7 @@ describe("記憶をまとめる仕事", () => {
 		expect(state).toMatchObject({
 			readUntil: null,
 			updatedAt: null,
-			failure:
-				"AnthropicのAPIキーが無効です。`/setup` から登録し直してください。",
+			failure: "いまはAIを呼び出せません。Bobertの管理者に知らせてください。",
 			items: [],
 		});
 		// ONにした画面は、失敗の理由を書いた画面に書き換える
@@ -684,7 +683,7 @@ describe("記憶をまとめる仕事", () => {
 	});
 
 	it("Bobertにsigwのキーがなければ、まとめられないことを記録する", async () => {
-		const user = await userWith();
+		const user = await newUser();
 		await setMemoryEnabled(env.DB, user.id, GUILD_ID, true);
 		mockFetch(() => new Response(null, { status: 500 }));
 
@@ -759,7 +758,7 @@ describe("記憶をまとめる仕事", () => {
 
 describe("記憶の更新の予約", () => {
 	it("使っていれば、前回の更新から1日たつまでに1回だけ始める。失敗した後は、1時間たてば試し直す", async () => {
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const now = 10 * MEMORY_UPDATE_INTERVAL_MS;
 		const claim = (at: number) =>
 			claimMemoryUpdate(env.DB, user.id, GUILD_ID, { now: at });
@@ -794,7 +793,7 @@ describe("記憶の更新の予約", () => {
 
 	it("返答の後に予約する。始められたときだけ、仕事を入れる。DMでは入れない", async () => {
 		const { environment, sent } = fakeQueues();
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		await setMemoryEnabled(env.DB, user.id, GUILD_ID, true);
 
 		await scheduleMemoryUpdate(environment, user.id, GUILD_ID);
@@ -1066,7 +1065,7 @@ describe("/delete", () => {
 		);
 
 		expect(confirm.data.content).toBe(
-			`登録したAPIキー(Anthropic、OpenRouter)と設定を、すべて削除します。${DELETE_MEMORY_NOTE}よろしいですか?`,
+			`あなたの設定(モデルや自分用の指示など)を、すべて削除します。${DELETE_MEMORY_NOTE}よろしいですか?`,
 		);
 
 		await sendInteraction(pressButton(user, "delete:confirm"));

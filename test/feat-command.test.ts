@@ -17,7 +17,7 @@ import {
 } from "./helpers";
 
 /** 新しいユーザー(テストごとに別の人にする) */
-const userWith = userFactory(700);
+const newUser = userFactory(700);
 
 function featCommand(user: APIUser) {
 	return guildInteraction(
@@ -38,7 +38,7 @@ function press(user: APIUser, customId: string) {
 
 describe("/feat", () => {
 	it("機能ごとのON/OFFのボタンを、本人にだけ見せる。ONは緑、OFFは灰色", async () => {
-		const body = await sendInteraction(featCommand(await userWith()));
+		const body = await sendInteraction(featCommand(await newUser()));
 
 		expect(body.type).toBe(InteractionResponseType.ChannelMessageWithSource);
 		expect(body.data.flags).toBe(MessageFlags.Ephemeral);
@@ -67,7 +67,7 @@ describe("/feat", () => {
 	});
 
 	it("ボタンを押すと、その機能のON/OFFを切り替えて保存し、ボタンの表示を新しくする", async () => {
-		const user = await userWith();
+		const user = await newUser();
 
 		const first = await sendInteraction(press(user, "feat:usage_display"));
 
@@ -94,7 +94,7 @@ describe("/feat", () => {
 	});
 
 	it("動画の作成は、BobertにAnthropicのsigwのキーがなければ、ONにせずに知らせる", async () => {
-		const user = await userWith("anthropic");
+		const user = await newUser();
 
 		const body = await sendInteraction(
 			press(user, "feat:video"),
@@ -112,7 +112,7 @@ describe("/feat", () => {
 	});
 
 	it("本人のキーがなくても、動画の作成をONにできる", async () => {
-		const user = await userWith();
+		const user = await newUser();
 
 		const on = await sendInteraction(press(user, "feat:video"));
 

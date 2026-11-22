@@ -168,16 +168,6 @@ export class LlmError extends Error {
 	}
 }
 
-/** キーの確認の結果。確かめられなかったときは、原因の説明を付ける */
-export type KeyCheckResult =
-	| { status: "valid" }
-	| { status: "invalid" }
-	/** ワークスペースに属さないキーなのに、ワークスペースIDがない */
-	| { status: "needs_workspace" }
-	/** 入力されたワークスペースIDが正しくないか、このキーでは使えない */
-	| { status: "workspace_not_found" }
-	| { status: "unavailable"; detail: string };
-
 /** 「その他」で入力されたモデルの確認の結果。確かめられなかったときは、原因の説明を付ける */
 export type ModelCheckResult =
 	/**
@@ -191,7 +181,7 @@ export type ModelCheckResult =
 			maxInputTokens: number | null;
 	  }
 	| { status: "not_found" }
-	/** 登録したキーが無効になっている */
+	/** Bobertのsigwのキーが無効になっている */
 	| { status: "invalid_key" }
 	| { status: "unavailable"; detail: string };
 

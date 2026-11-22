@@ -184,7 +184,7 @@ describe("/agentsecrets", () => {
 	});
 
 	it("BobertにAnthropicのsigwのキーがなければ、AIを呼び出せないと知らせる", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const { calls } = mockVaultApis();
 
 		expect(await sendInteraction(command(user), openRouterOnlyEnv())).toEqual({
@@ -195,7 +195,7 @@ describe("/agentsecrets", () => {
 	});
 
 	it("秘密がなければ「なし」と注意を書き、追加のボタンだけを付ける(vaultは作らない)", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const { calls } = mockVaultApis();
 
 		const response = await sendInteraction(command(user));
@@ -225,7 +225,7 @@ describe("/agentsecrets", () => {
 	});
 
 	it("「追加」を押すと、名前・値・送り先の入力画面を開く(Basic認証の入力画面はない)", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 
 		const add = await sendInteraction(press(user, "agentsecrets:add"));
 
@@ -237,7 +237,7 @@ describe("/agentsecrets", () => {
 	});
 
 	it("追加すると、vaultを作って、送り先のホストのヘッダーにだけ差し替わる秘密として預け、一覧に出す", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const { calls } = mockVaultApis();
 
 		await sendInteraction(
@@ -288,7 +288,7 @@ describe("/agentsecrets", () => {
 	});
 
 	it("同じ名前と、20個を超える秘密は預けない", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const { calls, vaults } = mockVaultApis();
 		const add = (name: string) =>
 			sendInteraction(
@@ -316,7 +316,7 @@ describe("/agentsecrets", () => {
 	});
 
 	it("名前と送り先の形が違えば、預けずに理由を見せる", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const { calls } = mockVaultApis();
 
 		const badName = await sendInteraction(
@@ -346,7 +346,7 @@ describe("/agentsecrets", () => {
 	});
 
 	it("記録したvaultが見つからなければ(ワークスペースを替えたなど)、作り直して預ける", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		await saveAgentVault(env.DB, user.id, "vlt_gone");
 		const { calls } = mockVaultApis();
 
@@ -363,7 +363,7 @@ describe("/agentsecrets", () => {
 	});
 
 	it("選ぶと削除を確かめ、「削除する」で消す", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const { calls, vaults } = mockVaultApis();
 		await sendInteraction(
 			submit(user, "agentsecrets:add-modal", {
@@ -406,7 +406,7 @@ describe("/agentsecrets", () => {
 	});
 
 	it("Anthropicとのやり取りに失敗したら、/agent と同じ理由の文を添えて知らせる", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const calls = mockFetch((call) =>
 			call.url.hostname === "api.anthropic.com"
 				? Response.json(
@@ -474,7 +474,7 @@ describe("セッションに渡す", () => {
 
 describe("セッションと /delete", () => {
 	it("秘密があれば、セッションを作るときにvaultをつなぎ、指示に名前と送り先を書く", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const { calls } = mockVaultApis();
 		await sendInteraction(
 			submit(user, "agentsecrets:add-modal", {
@@ -547,7 +547,7 @@ describe("セッションと /delete", () => {
 	});
 
 	it("秘密がなければ、vaultをつながない", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		mockVaultApis();
 		await saveAgentVault(env.DB, user.id, "vlt_empty");
 
@@ -561,7 +561,7 @@ describe("セッションと /delete", () => {
 	});
 
 	it("/delete で、vaultごと消し、記録も消す", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const { calls } = mockVaultApis();
 		await sendInteraction(
 			submit(user, "agentsecrets:add-modal", {

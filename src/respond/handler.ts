@@ -402,7 +402,7 @@ export async function answer(
 		heardFrom?: string;
 		/**
 		 * 動画を頼めるメッセージ(メンションや返信で話しかけたメッセージ)。「Bobertに聞く」などでは渡さない。
-		 * /feat で「動画の作成」をONにし、Anthropicのキーを登録した人にだけ、動画の道具を渡す
+		 * /feat で「動画の作成」をONにした人にだけ、動画の道具を渡す(BobertにAnthropicのsigwのキーが要る)
 		 * (仕様: docs/spec/behavior.md「動画の作成」)
 		 */
 		videoTrigger?: StoredMessageInput;

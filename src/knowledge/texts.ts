@@ -23,7 +23,7 @@ export function knowledgeListLine(channelId: string, files: number): string {
 	return `- ${channelMention(channelId)}(ファイル${files}件)`;
 }
 export function knowledgeDesignated(channelId: string): string {
-	return `${channelMention(channelId)} を知識チャンネルにしました。これから送られたPDF、Word、Excel、PowerPoint、テキストのファイルを、送った人のAIのキーで要約して、AIの知識に加えます。指定する前に送られたファイルは加えません。`;
+	return `${channelMention(channelId)} を知識チャンネルにしました。これから送られたPDF、Word、Excel、PowerPoint、テキストのファイルを要約して、AIの知識に加えます。要約の費用は、送った人が払います。指定する前に送られたファイルは加えません。`;
 }
 export function knowledgeUnsetConfirm(
 	channelId: string,
@@ -66,7 +66,7 @@ export function knowledgeUnreadable(filename: string | null): string {
 	return `${notAdded(filename)}ファイルを読めませんでした。壊れているか、パスワードが付いている可能性があります。`;
 }
 
-/** 要約できない(キーが無効、残高不足など)。reasonは、メンションへの返答のエラーと同じ文 */
+/** 要約できない(sigwに断られた、混み合っているなど)。reasonは、メンションへの返答のエラーと同じ文 */
 export function knowledgeSummaryFailed(
 	filename: string | null,
 	reason: string,
@@ -96,7 +96,7 @@ export function knowledgeProgress(
 
 /** /help の使い方に足す1行(記憶の行の次) */
 export const KNOWLEDGE_HELP =
-	"- `/knowledge` で知識チャンネルを指定すると、そこに送られたPDF、Word、Excel、PowerPoint、テキストのファイルを、AIが要約して覚え、返答に使います。要約の費用は、ファイルを送った人のキーにかかります。指定と解除は、サーバー管理者が行います。";
+	"- `/knowledge` で知識チャンネルを指定すると、そこに送られたPDF、Word、Excel、PowerPoint、テキストのファイルを、AIが要約して覚え、返答に使います。要約の費用は、ファイルを送った人が払います。指定と解除は、サーバー管理者が行います。";
 
 /*
  * ここから下は、AIに渡す文(Discordには表示しない)
