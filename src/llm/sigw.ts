@@ -1,6 +1,6 @@
 /**
  * sigw(4rtofl/si-gateway)を通したAIの呼び出し(仕様: docs/spec/llm-cost.md「AIの呼び出しと費用の負担」)。
- * AnthropicもOpenRouterも、Bobert用のsigwのキーで、Service Binding(env.SIGW)から呼ぶ。
+ * AnthropicもOpenRouterも、Jev(TypeSafe)も、Bobert用のsigwのキーで、Service Binding(env.SIGW)から呼ぶ。
  * 費用を払う人(返答を頼んだ人)のDiscordのIDを、呼び出しのたびに x-sigw-user ヘッダーで渡す。
  * sigwが記録し、毎月まとめて精算する。
  */
@@ -18,6 +18,7 @@ export const AI_UNAVAILABLE_TEXT =
 const SIGW_ORIGIN = "https://sigw";
 const ANTHROPIC_BASE_URL = `${SIGW_ORIGIN}/anthropic`;
 const OPENROUTER_BASE_URL = `${SIGW_ORIGIN}/openrouter/api/v1`;
+const TYPESAFE_BASE_URL = `${SIGW_ORIGIN}/typesafe/v1`;
 
 /** 費用を払う人を、sigwに伝えるヘッダー */
 const USER_HEADER = "x-sigw-user";
@@ -72,6 +73,25 @@ export function sigwOpenRouterFetch(
 		headers: {
 			...init.headers,
 			Authorization: `Bearer ${env.SIGW_OPENROUTER_KEY}`,
+			[USER_HEADER]: userId,
+		},
+	});
+}
+
+/**
+ * sigw経由で、TypeSafeのAPI(Jev。pathは /systemone など)を呼ぶ。
+ * キーは、TypeSafe用のsigwのキー(SIGW_TYPESAFE_KEY)。空なら呼ばない(呼ぶ前に確かめる)
+ */
+export function sigwTypeSafeFetch(
+	{ env, userId }: SigwCaller,
+	path: string,
+	init: RequestInit & { headers?: Record<string, string> },
+): Promise<Response> {
+	return env.SIGW.fetch(`${TYPESAFE_BASE_URL}${path}`, {
+		...init,
+		headers: {
+			...init.headers,
+			Authorization: `Bearer ${env.SIGW_TYPESAFE_KEY}`,
 			[USER_HEADER]: userId,
 		},
 	});

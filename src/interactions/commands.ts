@@ -82,8 +82,7 @@ export const COMMANDS: RESTPutAPIApplicationCommandsJSONBody = [
 	{
 		...GUILD_ONLY,
 		name: "setup",
-		description:
-			"Anthropic APIキーの登録・OpenRouterへのログイン・TypeSafe APIキーの登録(Jev用)",
+		description: "Anthropic APIキーの登録・OpenRouterへのログイン",
 	},
 	{
 		...GUILD_ONLY,

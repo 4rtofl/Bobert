@@ -11,24 +11,19 @@ import {
 	MessageFlags,
 	TextInputStyle,
 } from "../discord/constants";
-import { checkTypeSafeKey } from "../jev/api";
-import { TYPESAFE_KEY_NOTE, TYPESAFE_KEY_REGISTERED } from "../jev/texts";
 import { type AnthropicCredential, checkAnthropicKey } from "../llm/anthropic";
 import type { KeyCheckResult } from "../llm/types";
 import { logEvent } from "../log";
 import { createOpenRouterAuthLink } from "../oauth/openrouter";
-import { hasTypeSafeKey, saveTypeSafeKey } from "../store/typesafe";
 import { getRegisteredProviders, saveCredential } from "../store/users";
 import { normalizeInput, PRINTABLE_ASCII, readTextInput } from "./input";
 
 /** 「Anthropicのキーを登録」ボタンと、キーを入力するモーダルのID */
 export const SETUP_ANTHROPIC_ID = "setup:anthropic";
-/** 「TypeSafeのキーを登録」ボタンと、キーを入力するモーダルのID(「Jevに聞く」で使うキー) */
-export const SETUP_TYPESAFE_ID = "setup:typesafe";
 const API_KEY_INPUT_ID = "api_key";
 const WORKSPACE_INPUT_ID = "workspace_id";
 
-/** キーの確認や登録に失敗したときの文(AnthropicとTypeSafeで共通) */
+/** キーの確認や登録に失敗したときの文 */
 const KEY_REJECTED =
 	"このAPIキーは使えませんでした。キーを確かめて、もう一度登録してください。";
 const KEY_CHECK_UNAVAILABLE =
@@ -49,9 +44,8 @@ export async function setupCommand(
 	user: APIUser,
 	interactionToken: string,
 ): Promise<APIInteractionResponse> {
-	const [providers, typeSafe, openRouterLink] = await Promise.all([
+	const [providers, openRouterLink] = await Promise.all([
 		getRegisteredProviders(env.DB, user.id),
-		hasTypeSafeKey(env.DB, user.id),
 		createOpenRouterAuthLink(env, origin, user, interactionToken),
 	]);
 	const anthropic = providers.has("anthropic");
@@ -65,10 +59,8 @@ export async function setupCommand(
 				"",
 				`- Anthropic: ${anthropic ? "登録済み" : "未登録"}`,
 				`- OpenRouter: ${openRouter ? "連携済み" : "未連携"}`,
-				`- TypeSafe: ${typeSafe ? "登録済み" : "未登録"}`,
 				"",
 				"-# OpenRouterとの連携のリンクは10分間有効です。",
-				TYPESAFE_KEY_NOTE,
 			].join("\n"),
 			components: [
 				{
@@ -87,14 +79,6 @@ export async function setupCommand(
 							style: ButtonStyle.Link,
 							url: openRouterLink,
 							label: openRouter ? "OpenRouterと連携し直す" : "OpenRouterと連携",
-						},
-						{
-							type: ComponentType.Button,
-							style: ButtonStyle.Secondary,
-							custom_id: SETUP_TYPESAFE_ID,
-							label: typeSafe
-								? "TypeSafeのキーを登録し直す"
-								: "TypeSafeのキーを登録",
 						},
 					],
 				},
@@ -253,107 +237,6 @@ async function verifyAndSave(
 				userId,
 				key,
 				detail: check.detail,
-			});
-			return KEY_CHECK_UNAVAILABLE;
-	}
-}
-
-/** 「TypeSafeのキーを登録」ボタン: キーを入力するモーダルを開く(「Jevに聞く」で使うキー) */
-export function typeSafeKeyModal(): APIInteractionResponse {
-	return {
-		type: InteractionResponseType.Modal,
-		data: {
-			custom_id: SETUP_TYPESAFE_ID,
-			title: "TypeSafeのAPIキーの登録",
-			components: [
-				{
-					type: ComponentType.Label,
-					label: "APIキー",
-					description:
-						"TypeSafeのコンソール(console.typesafe.ai)で発行したキー",
-					component: {
-						type: ComponentType.TextInput,
-						custom_id: API_KEY_INPUT_ID,
-						style: TextInputStyle.Short,
-						required: true,
-						min_length: 10,
-						max_length: 200,
-					},
-				},
-			],
-		},
-	};
-}
-
-/**
- * TypeSafeのキーのモーダルの送信: キーが有効か確かめてから保存する。
- * Anthropicのキーと同じく、先に保留の応答を返し、結果で書き換える
- */
-export function submitTypeSafeKey(
-	interaction: APIModalSubmitInteraction,
-	env: Env,
-	ctx: ExecutionContext,
-	userId: string,
-): APIInteractionResponse {
-	const apiKey = normalizeInput(
-		readTextInput(interaction, API_KEY_INPUT_ID) ?? "",
-	);
-	ctx.waitUntil(
-		registerTypeSafeKey(
-			env,
-			interaction.application_id,
-			interaction.token,
-			userId,
-			apiKey,
-		),
-	);
-	return {
-		type: InteractionResponseType.DeferredChannelMessageWithSource,
-		data: { flags: MessageFlags.Ephemeral },
-	};
-}
-
-async function registerTypeSafeKey(
-	env: Env,
-	applicationId: string,
-	interactionToken: string,
-	userId: string,
-	apiKey: string,
-): Promise<void> {
-	let content: string;
-	try {
-		content = await verifyAndSaveTypeSafeKey(env, userId, apiKey);
-	} catch (error) {
-		log("typesafe_key_register_failed", { userId, error: errorName(error) });
-		content = REGISTER_FAILED;
-	}
-	await showResult(applicationId, interactionToken, userId, content);
-}
-
-/** TypeSafeのキーが使えるか確かめ、使えれば保存する。本人に見せる結果の文を返す */
-async function verifyAndSaveTypeSafeKey(
-	env: Env,
-	userId: string,
-	apiKey: string,
-): Promise<string> {
-	// 使えない文字が残っていると、APIに送ること自体ができない
-	if (!PRINTABLE_ASCII.test(apiKey)) {
-		log("typesafe_key_malformed", { userId, length: apiKey.length });
-		return "キーに使えない文字が含まれています。TypeSafeのコンソールでコピーし直して、もう一度登録してください。";
-	}
-	const check = await checkTypeSafeKey(apiKey);
-	switch (check.status) {
-		case "valid":
-			await saveTypeSafeKey(env, userId, apiKey);
-			log("typesafe_key_registered", { userId });
-			return TYPESAFE_KEY_REGISTERED;
-		case "invalid":
-			log("typesafe_key_rejected", { userId, length: apiKey.length });
-			return KEY_REJECTED;
-		default:
-			log("typesafe_key_check_unavailable", {
-				userId,
-				detail: "detail" in check ? check.detail : null,
 			});
 			return KEY_CHECK_UNAVAILABLE;
 	}

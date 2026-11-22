@@ -13,12 +13,11 @@ import {
 	JEV_QUESTION_MAX_LENGTH,
 	JEV_QUESTION_OPTION,
 	type JevSource,
-	typeSafeKeyRequired,
 } from "../jev/texts";
+import { AI_UNAVAILABLE_TEXT } from "../llm/sigw";
 import type { QueueMessage, StoredMessageInput } from "../queue/messages";
 import { fromDiscord } from "../respond/history";
 import { resolvePaidModel } from "../respond/payer";
-import { hasTypeSafeKey } from "../store/typesafe";
 import { getUserSettings } from "../store/users";
 
 /** InteractionのうちJevの仕事に要るもの(右クリックメニューと`/jev`で共通) */
@@ -88,7 +87,7 @@ export async function jevFromCommand(
 
 /**
  * Jevに聞く仕事を始める。AIを呼び出せなければ(Bobertにsigwのキーがない)、そのことを本人にだけ見せる。
- * TypeSafeのキーを登録していなければ、その登録方法を本人にだけ見せる(Jevの費用は、寄付では払わないため)。
+ * JevもAIと同じく、Bobertにsigwのキー(TypeSafe用)がなければ、そのことを本人にだけ見せる。
  * 使えれば、チャンネルに見える保留の応答を返し、応答用のQueueでJevに聞く。
  * 寄付した人がサーバーにいるかは、3秒以内に応答するため、ここでは確かめず、聞くときに確かめる
  */
@@ -109,8 +108,8 @@ async function startJev(
 	if (!paid.ok) {
 		return ephemeral(paid.guidance);
 	}
-	if (!(await hasTypeSafeKey(env.DB, user.id))) {
-		return ephemeral(typeSafeKeyRequired(source));
+	if (!env.SIGW_TYPESAFE_KEY) {
+		return ephemeral(AI_UNAVAILABLE_TEXT);
 	}
 	const message = target();
 	await env.RESPOND_QUEUE.send({

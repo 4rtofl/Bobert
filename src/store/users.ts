@@ -201,8 +201,7 @@ export async function loadCredential(
 }
 
 /**
- * 登録したキーと設定をすべて消す(/delete)。キーがなくなるので、寄付も消す。GitHubとの連携も消す。
- * TypeSafeのキー(「Jevに聞く」で使う)も消す
+ * 登録したキーと設定をすべて消す(/delete)。キーがなくなるので、寄付も消す。GitHubとの連携も消す
  */
 export async function deleteUserData(
 	db: D1Database,
@@ -210,9 +209,6 @@ export async function deleteUserData(
 ): Promise<void> {
 	await db.batch([
 		db.prepare("DELETE FROM credentials WHERE user_id = ?").bind(userId),
-		db
-			.prepare("DELETE FROM typesafe_credentials WHERE user_id = ?")
-			.bind(userId),
 		db.prepare("DELETE FROM users WHERE user_id = ?").bind(userId),
 		db.prepare("DELETE FROM oauth_states WHERE user_id = ?").bind(userId),
 		db.prepare("DELETE FROM donations WHERE donor_id = ?").bind(userId),

@@ -2,20 +2,14 @@ import { createMessage, editOriginalInteractionResponse } from "../discord/api";
 import type { JevError } from "../jev/api";
 import { formatJevAnswers } from "../jev/format";
 import { JEV_REQUEST, JEV_SYSTEM_PROMPT } from "../jev/prompt";
-import {
-	JEV_ERROR,
-	JEV_NO_QUESTION,
-	jevNoTools,
-	TYPESAFE_KEY_INVALID,
-	typeSafeKeyRequired,
-} from "../jev/texts";
+import { JEV_ERROR, JEV_NO_QUESTION, jevNoTools } from "../jev/texts";
 import { askJevTool, emptyJevOutcome, type JevOutcome } from "../jev/tool";
+import { AI_UNAVAILABLE_TEXT } from "../llm/sigw";
 import type { ChatResult } from "../llm/types";
 import { logEvent } from "../log";
 import type { JevJob, StoredMessageInput } from "../queue/messages";
 import { saveExplainTarget } from "../store/explain";
 import { claimMessage, releaseMessage } from "../store/messages";
-import { loadTypeSafeKey } from "../store/typesafe";
 import { voiceReaderFor } from "../voice/reader";
 import { FileCatalog } from "./attachments";
 import { toConversation } from "./conversation";
@@ -51,7 +45,7 @@ const MAX_OUTPUT_TOKENS = 16_000;
 
 /**
  * 右クリックメニューの「Jevに聞く」と`/jev`の仕事(仕様: docs/spec/architecture.md「Jevに聞く」)。
- * 使った人のキーと設定のモデルに、Jevへの質問を作ってもらい、使った人のTypeSafeのキーでJevに聞く。
+ * 使った人の設定のモデルに、Jevへの質問を作ってもらい、sigw経由でJevに聞く(費用は、使った人に付ける)。
  * 保留にした応答(チャンネルに見える)を、Jevの回答に書き換えて投稿する。
  * 予期しない失敗は例外のままにして、Queueにやり直させる。
  */
@@ -72,17 +66,15 @@ export async function handleJevJob(job: JevJob, env: Env): Promise<void> {
 
 async function askAndPost(job: JevJob, env: Env): Promise<void> {
 	const source = job.source ?? "menu";
-	const apiKey = await loadTypeSafeKey(env, job.userId);
-	// 右クリックメニューか`/jev`を使った後に、/delete でキーを消した
-	const text =
-		apiKey === null
-			? typeSafeKeyRequired(source)
-			: await withReplyModel(
-					env,
-					{ userId: job.userId, guildId: job.guildId },
-					(context) => askJevWith(context, env, job, apiKey),
-					(guidance) => guidance,
-				);
+	// 右クリックメニューか`/jev`を使った後に、TypeSafe用のsigwのキーが外された
+	const text = !env.SIGW_TYPESAFE_KEY
+		? AI_UNAVAILABLE_TEXT
+		: await withReplyModel(
+				env,
+				{ userId: job.userId, guildId: job.guildId },
+				(context) => askJevWith(context, env, job),
+				(guidance) => guidance,
+			);
 	const [first] = await postResult(env, job, text);
 	// `/jev`の対象は、Discordにはないメッセージなので、結果との対応は残さない
 	if (first !== undefined && source === "menu") {
@@ -99,7 +91,6 @@ async function askJevWith(
 	context: ReplyModel,
 	env: Env,
 	job: JevJob,
-	apiKey: string,
 ): Promise<string> {
 	const { userId, settings, model } = context;
 	// 文脈を調べる道具と、Jevに聞く道具が要る
@@ -170,7 +161,7 @@ async function askJevWith(
 		...(startsWithReply(job.target)
 			? [replyChainTool(job.target, history, botUserId, files)]
 			: []),
-		askJevTool(apiKey, job.target, outcome),
+		askJevTool({ env, userId: job.userId }, job.target, outcome),
 	];
 	const startedAt = Date.now();
 	const result = await context.callModel({
@@ -199,7 +190,7 @@ async function askJevWith(
 		fileReads: fileReads.calls,
 		...result.usage,
 	});
-	// 利用量の表示と寄付の行は、AIの分だけ。Jevの費用は、本人のTypeSafeのアカウントにかかる
+	// 利用量の表示と寄付の行は、AIの分だけ(Jevの費用は、利用量の表示に入れない)
 	const notes = [
 		settings.featUsageDisplay
 			? await usageNote(
@@ -230,8 +221,12 @@ function resultBody(outcome: JevOutcome, result: ChatResult): string {
 /** Jevの呼び出しに失敗したときの、短い理由 */
 function describeJevError(error: JevError): string {
 	switch (error.kind) {
+		// sigw自身が断ったときは(上限額に達した、など)、sigwの文で理由を伝える
+		case "sigw":
+			return error.sigwMessage ?? JEV_ERROR;
+		// Bobertのsigwのキーが使えない。利用者には直せないので、管理者に知らせてもらう
 		case "invalid_key":
-			return TYPESAFE_KEY_INVALID;
+			return AI_UNAVAILABLE_TEXT;
 		case "rate_limited":
 			return RATE_LIMITED_TEXT;
 		default:
