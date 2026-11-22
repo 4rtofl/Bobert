@@ -10,7 +10,6 @@ import type { MemoryState } from "../store/memory";
 import {
 	MEMORY_CLEAR_LABEL,
 	MEMORY_COST_NOTE,
-	MEMORY_DONATION_NOTE,
 	MEMORY_EDIT_LABEL,
 	MEMORY_EMPTY,
 	MEMORY_KEPT_NOTE,
@@ -56,7 +55,6 @@ export function memoryScreen(state: MemoryState | null): MemoryScreen {
 				MEMORY_OFF_TITLE,
 				MEMORY_OFF_EXPLANATION,
 				MEMORY_COST_NOTE,
-				MEMORY_DONATION_NOTE,
 				...(state !== null && state.items.length > 0 ? [MEMORY_KEPT_NOTE] : []),
 			].join("\n"),
 			components: [

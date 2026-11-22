@@ -7,7 +7,7 @@
 export const HEARD_NOTE_MAX_CHARS = 200;
 
 /**
- * 聞き取った内容の行。普通のBobertは返答の末尾(利用量や寄付の行より上)に、エージェントは音声メッセージへの返信で示す。
+ * 聞き取った内容の行。普通のBobertは返答の末尾(利用量の行より上)に、エージェントは音声メッセージへの返信で示す。
  * 小さな文字の1行にするので、Discordの書式になる文字は、そのまま見えるようにする
  */
 export function heardNote(text: string): string {

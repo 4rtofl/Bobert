@@ -1,11 +1,43 @@
-import { AI_UNAVAILABLE_TEXT } from "../llm/sigw";
+import { AI_UNAVAILABLE_TEXT, sigwProviders } from "../llm/sigw";
 import type { ChatResult, LlmError } from "../llm/types";
 import { MEMORY_UPDATED_NOTE } from "../memory/texts";
-import type { Provider } from "../store/users";
+import type { Provider, UserSettings } from "../store/users";
 import { stripReplyHeader } from "./conversation";
-import type { ModelResolution, ResolvedModel } from "./model";
-import { formatCost } from "./usage";
+import {
+	type ModelResolution,
+	type ResolvedModel,
+	resolveModel,
+} from "./model";
 import { sourcesNote } from "./web-search";
+
+export type ReplyModelResolution =
+	| { ok: true; model: ResolvedModel }
+	| {
+			ok: false;
+			/** 何が足りないか(ログ用) */
+			missing: Extract<ModelResolution, { ok: false }>["missing"];
+			/** 本人に見せる、使えない理由 */
+			guidance: string;
+	  };
+
+/**
+ * 返答に使うモデルを、本人の設定と、Bobertにあるsigwのキーから決める
+ * (仕様: docs/spec/llm-cost.md「AIの呼び出しと費用の負担」)。
+ * 費用は、頼んだ本人がsigwで払う。呼べなければ、本人に見せる理由を付けて返す
+ */
+export function resolveReplyModel(
+	env: Env,
+	settings: UserSettings,
+): ReplyModelResolution {
+	const resolution = resolveModel(settings, sigwProviders(env));
+	return resolution.ok
+		? resolution
+		: {
+				ok: false,
+				missing: resolution.missing,
+				guidance: modelUnavailableText(resolution),
+			};
+}
 
 /**
  * モデルを呼べないときの知らせ(仕様: docs/spec/llm-cost.md「AIの呼び出しと費用の負担」)。
@@ -22,18 +54,6 @@ export function modelUnavailableText(
 /** モデルが見つからないか、使えないときの知らせ */
 function modelNotFoundText(label: string): string {
 	return `モデル「${label}」が見つからないか、いまは使えません。`;
-}
-
-/**
- * キーのない人への案内の先頭に足す文(仕様: docs/spec/llm-cost.md「クレジットの寄付」)。
- * 寄付されたことがあるサーバーで、いま使える寄付がないときに足す
- */
-export const DONATIONS_UNAVAILABLE =
-	"このサーバーに寄付されたクレジットは、いまは使えません。";
-
-/** 寄付で答えた返答の末尾に添える行。残りは、サーバー全体の寄付の残り(USD) */
-export function donationNote(remainingUsd: number): string {
-	return `-# 寄付されたクレジットで答えました(残り 約$${formatCost(remainingUsd)})`;
 }
 
 /** AIに内容を断られたときの返答 */
@@ -103,8 +123,6 @@ export interface ReplyNotes {
 	memoryUpdated?: boolean;
 	/** 利用量の表示の行。表示しないならnull */
 	usage: string | null;
-	/** 寄付で答えたときの行。寄付で答えなかったらnull */
-	donation?: string | null;
 	/**
 	 * 要約を勧める案内を添えるなら、料金が上がる境目(入力のトークン数)。添えないならnull。
 	 * 案内には「今すぐ要約」ボタンを付ける(投稿するときに付ける)
@@ -122,12 +140,11 @@ export function formatReply(
 		skills = [],
 		memoryUpdated = false,
 		usage,
-		donation = null,
 		compaction = null,
 	}: ReplyNotes,
 ): string {
-	// 利用量の行の下に、寄付で答えたことを書く。聞き取った内容は、それより上に書く
-	const costLines = [usage, donation].filter((line) => line !== null);
+	// 聞き取った内容は、利用量の行より上に書く
+	const costLines = usage === null ? [] : [usage];
 	const heardLines = heard === null ? [] : [heard];
 	if (result.stopReason === "refusal") {
 		return [REFUSAL_TEXT, ...heardLines, ...costLines].join("\n");

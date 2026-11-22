@@ -124,7 +124,7 @@ async function turnOn(
 	userId: string,
 	guildId: string,
 ): Promise<APIInteractionResponse> {
-	// まとめる費用は本人にかける(寄付は使わない)。Bobertにsigwのキーがなければ、まとめられない
+	// まとめる費用は本人にかける。Bobertにsigwのキーがなければ、まとめられない
 	if (sigwProviders(env).size === 0) {
 		return {
 			type: InteractionResponseType.ChannelMessageWithSource,

@@ -17,7 +17,7 @@ import {
 import { AI_UNAVAILABLE_TEXT } from "../llm/sigw";
 import type { QueueMessage, StoredMessageInput } from "../queue/messages";
 import { fromDiscord } from "../respond/history";
-import { resolvePaidModel } from "../respond/payer";
+import { resolveReplyModel } from "../respond/replies";
 import { getUserSettings } from "../store/users";
 
 /** InteractionのうちJevの仕事に要るもの(右クリックメニューと`/jev`で共通) */
@@ -88,8 +88,7 @@ export async function jevFromCommand(
 /**
  * Jevに聞く仕事を始める。AIを呼び出せなければ(Bobertにsigwのキーがない)、そのことを本人にだけ見せる。
  * JevもAIと同じく、Bobertにsigwのキー(TypeSafe用)がなければ、そのことを本人にだけ見せる。
- * 使えれば、チャンネルに見える保留の応答を返し、応答用のQueueでJevに聞く。
- * 寄付した人がサーバーにいるかは、3秒以内に応答するため、ここでは確かめず、聞くときに確かめる
+ * 使えれば、チャンネルに見える保留の応答を返し、応答用のQueueでJevに聞く
  */
 async function startJev(
 	env: Env,
@@ -99,12 +98,7 @@ async function startJev(
 	target: () => StoredMessageInput,
 ): Promise<APIInteractionResponse> {
 	const guildId = interaction.guild_id ?? null;
-	const paid = await resolvePaidModel(env, {
-		userId: user.id,
-		guildId,
-		settings: await getUserSettings(env.DB, user.id),
-		checkMembership: false,
-	});
+	const paid = resolveReplyModel(env, await getUserSettings(env.DB, user.id));
 	if (!paid.ok) {
 		return ephemeral(paid.guidance);
 	}
