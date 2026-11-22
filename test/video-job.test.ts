@@ -186,7 +186,8 @@ describe("動画の仕事のDurable Object", () => {
 	});
 
 	it("動画用のエージェントと環境を作ってセッションを始め、台本をファイルで置いて、手順を送る", async () => {
-		const owner = await newUser("anthropic");
+		// 本人のキーは要らない。sigw経由で、頼んだ人の費用として呼ぶ
+		const owner = await newUser();
 		const calls = mockApis({ status: "running", events: [], outputs: [] });
 		const stub = await startedJob(owner.id);
 
@@ -223,6 +224,15 @@ describe("動画の仕事のDurable Object", () => {
 			1,
 		);
 		expect(posted(calls)).toEqual([]);
+		// どの呼び出しも、Bobert用のsigwのキーで、頼んだ人のIDを付けて呼ぶ
+		const managed = calls.filter(
+			(call) => call.url.hostname === "api.anthropic.com",
+		);
+		expect(managed.length).toBeGreaterThan(0);
+		for (const call of managed) {
+			expect(call.headers.get("x-api-key")).toBe("sgk-anthropic-test");
+			expect(call.headers.get("x-sigw-user")).toBe(owner.id);
+		}
 	});
 
 	it("動画ができたら、頼んだメッセージへの返信として投稿し、セッションと記録を消す", async () => {
@@ -386,7 +396,7 @@ describe("動画の仕事のDurable Object", () => {
 		const calls = mockApis({ status: "running", events: [], outputs: [] });
 		const stub = await startedJob(owner.id);
 
-		await stub.purge({ apiKey: "key-anthropic", workspaceId: null });
+		await stub.purge();
 
 		expect(posted(calls)).toEqual([]);
 		expect(await getVideoJob(env.DB, owner.id)).toBeNull();

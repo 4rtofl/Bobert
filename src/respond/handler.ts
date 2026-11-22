@@ -14,7 +14,7 @@ import { type KnowledgeReads, readKnowledgeFileTool } from "../knowledge/tool";
 import { chatWithAnthropic } from "../llm/anthropic";
 import { findOpenRouterModel } from "../llm/model-info";
 import { chatWithOpenRouter } from "../llm/openrouter";
-import type { SigwCaller } from "../llm/sigw";
+import { type SigwCaller, sigwProviders } from "../llm/sigw";
 import {
 	type ChatRequest,
 	type ChatResult,
@@ -42,11 +42,7 @@ import {
 	claimCompactionNotice,
 	recordReplyUsage,
 } from "../store/summaries";
-import {
-	getRegisteredProviders,
-	getUserSettings,
-	type UserSettings,
-} from "../store/users";
+import { getUserSettings, type UserSettings } from "../store/users";
 import { videoJobStub } from "../video/store";
 import {
 	createVideoTool,
@@ -554,14 +550,14 @@ export async function answer(
 					memoryTool,
 				)
 			: null;
-	// 動画の道具。動画は本人のAnthropicのアカウントで作るので、寄付で答えるときも、本人のキーが要る
+	// 動画の道具。動画はManaged Agentsで作るので、BobertにAnthropicのsigwのキーが要る(費用は頼んだ人にかかる)
 	const videoTrigger = conversation.videoTrigger;
 	const video =
 		files !== undefined &&
 		guildId !== null &&
 		videoTrigger !== undefined &&
 		settings.featVideo &&
-		(await getRegisteredProviders(env.DB, userId)).has("anthropic")
+		sigwProviders(env).has("anthropic")
 			? {
 					requester: { userId, guildId, trigger: videoTrigger },
 					material: newVideoMaterial(),

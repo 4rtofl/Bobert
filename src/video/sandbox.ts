@@ -5,7 +5,7 @@ import { getVideoResources, saveVideoResources } from "./store";
 
 /**
  * 動画を作るサンドボックス(Managed Agents。仕様: docs/spec/architecture.md「動画の作成」)。
- * 本人のAnthropicのアカウントに、動画用のエージェントの設定と環境を1つずつ作る(Bobert Agentとは別)。
+ * Bobert専用のワークスペースに、本人ごとに、動画用のエージェントの設定と環境を1つずつ作る(Bobert Agentとは別)。
  * サンドボックスの中で Dopagakix を入れ、VOICEVOX ENGINE を起動し、check → 読みの直し → render の順に動画を作る
  * (手順は 4rtoflow/Dopagakix の docs/sandbox.md)
  */
@@ -88,7 +88,7 @@ export function videoInstructions(speakerId: number): string {
 
 /**
  * 動画を作るセッションを始める。エージェントの設定と環境がなければ作る。
- * 記録したものが見つからなければ(別のワークスペースのキーに替えたときなど)、作り直して、もう一度試す。
+ * 記録したものが見つからなければ(sigw経由に替える前に、本人のアカウントに作ったものなど)、作り直して、もう一度試す。
  * 台本はファイルとしてサンドボックスに置き、AIへの指示には入れない(会話の中の文が、指示として働かないように)
  */
 export async function startVideoSession(

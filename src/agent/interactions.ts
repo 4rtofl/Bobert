@@ -28,20 +28,18 @@ import {
 	type RepositoryLookup,
 } from "../github/account";
 import { type MessageEdit, respondLater } from "../interactions/deferred";
+import { AI_UNAVAILABLE_TEXT } from "../llm/sigw";
 import { logEvent } from "../log";
 import { createGitHubAuthLink } from "../oauth/github";
 import { LLM_ERROR_TEXT } from "../respond/replies";
-import {
-	type Credential,
-	getUserSettings,
-	loadCredential,
-} from "../store/users";
+import { getUserSettings } from "../store/users";
 import { listAgentSkills } from "./agent-skills";
 import { firstMessage } from "./first-message";
 import {
 	agentClient,
 	agentEffort,
 	agentModel,
+	agentsAvailable,
 	deleteSession,
 	describeAgentError,
 	repositoryMountPath,
@@ -101,7 +99,6 @@ import {
 	GITHUB_LINK_PROMPT,
 	GITHUB_LOOKUP_FAILED,
 	GITHUB_OPEN_BUTTON_LABEL,
-	KEY_MISSING,
 	NO_MANAGE_CHANNELS,
 	NOT_AGENT_CHANNEL,
 	OPERATION_FAILED,
@@ -155,7 +152,7 @@ export function agentCommand(
 }
 
 /**
- * /agent の返事。始められなければ(キーがない、セッションが多すぎる、権限がない)、その理由を返す。
+ * /agent の返事。始められなければ(Bobertにsigwのキーがない、セッションが多すぎる、権限がない)、その理由を返す。
  * 連携していれば、リポジトリを選ぶセレクトメニューを、していなければ、連携のボタンを返す
  */
 async function agentStartMenu(
@@ -165,7 +162,7 @@ async function agentStartMenu(
 	guildId: string,
 ): Promise<MessageEdit> {
 	const checked = await precheck(env, user.id, guildId, context);
-	if ("reply" in checked) {
+	if (checked !== null) {
 		return checked.reply;
 	}
 	let allowed: AllowedRepositories;
@@ -186,17 +183,16 @@ async function agentStartMenu(
 
 /**
  * セッションを始められるかを確かめる(/agent の返事を出すときと、リポジトリを選んだときの両方で確かめる)。
- * 始められれば本人のキーを、始められなければ、その理由の返事を返す
+ * 始められなければ、その理由の返事を返す
  */
 async function precheck(
 	env: Env,
 	userId: string,
 	guildId: string,
 	context: StartContext,
-): Promise<{ credential: Credential } | { reply: MessageEdit }> {
-	const credential = await loadCredential(env, userId, "anthropic");
-	if (credential === null) {
-		return { reply: { content: KEY_MISSING, components: [] } };
+): Promise<{ reply: MessageEdit } | null> {
+	if (!agentsAvailable(env)) {
+		return { reply: { content: AI_UNAVAILABLE_TEXT, components: [] } };
 	}
 	const active = await activeAgentChannels(env.DB, guildId, userId);
 	if (active.length >= MAX_ACTIVE_SESSIONS) {
@@ -211,7 +207,7 @@ async function precheck(
 	if (!hasPermission(permissions, PermissionFlags.ManageChannels)) {
 		return { reply: { content: NO_MANAGE_CHANNELS, components: [] } };
 	}
-	return { credential };
+	return null;
 }
 
 /**
@@ -245,10 +241,9 @@ async function startAgent(
 ): Promise<MessageEdit> {
 	const db = env.DB;
 	const checked = await precheck(env, user.id, guildId, context);
-	if ("reply" in checked) {
+	if (checked !== null) {
 		return checked.reply;
 	}
-	const { credential } = checked;
 	const permissions = BigInt(context.app_permissions ?? "0");
 
 	const settings = await getUserSettings(db, user.id);
@@ -256,7 +251,8 @@ async function startAgent(
 	const effort = agentEffort(settings);
 	const number = await nextAgentNumber(db, guildId, user.id);
 	const name = agentChannelName(user.username, number);
-	const client = agentClient(credential);
+	// 費用は、セッションを始めた本人にかかる
+	const client = agentClient(env, user.id);
 	let sessionId: string;
 	let repositoryResourceId: string | null;
 	try {

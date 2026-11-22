@@ -44,7 +44,7 @@ function isClaudeEffort(value: string): value is Effort {
 	return (CLAUDE_EFFORTS as readonly string[]).includes(value);
 }
 
-/** ユーザーが登録したAnthropicの資格情報(エージェントと動画で使う。返答などはsigwを通す) */
+/** ユーザーが登録したAnthropicの資格情報(/setup の確認でだけ使う。呼び出しはすべてsigwを通す。登録の仕組みは#128で見直す) */
 export interface AnthropicCredential {
 	apiKey: string;
 	/** キーがワークスペースに属さないとき(個人キーなど)に使うワークスペースのID */
@@ -426,7 +426,7 @@ function claudeEfforts(
 }
 
 /**
- * ユーザーが登録したキーで、SDKのクライアントを作る(エージェントと動画、キーの確認で使う)。
+ * ユーザーが登録したキーで、SDKのクライアントを作る(/setup のキーの確認でだけ使う)。
  * ワークスペースに属さないキーでは、使うワークスペースのIDをリクエストのたびにヘッダーで送る。
  */
 export function createClient(

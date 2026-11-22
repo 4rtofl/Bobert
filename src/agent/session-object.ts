@@ -16,14 +16,12 @@ import {
 	writeToGitHub,
 } from "../github/account";
 import { prepareGitHubWrite, runGitHubRead } from "../github/operations";
-import type { AnthropicCredential } from "../llm/anthropic";
 import { logEvent } from "../log";
 import { listPluginSkillFiles } from "../store/plugins";
 import { listSkillFiles } from "../store/skills";
-import { loadCredential } from "../store/users";
 import { transcribeAudio } from "../voice/voice";
 import { listAgentSkills, readAgentSkill } from "./agent-skills";
-import { agentClient, deleteSession } from "./managed";
+import { agentClient, agentsAvailable, deleteSession } from "./managed";
 import {
 	type AgentEvent,
 	type ApprovalResult,
@@ -201,10 +199,10 @@ export class AgentSession extends DurableObject<Env> {
 				return "already";
 			}
 			this.stopStreaming();
-			const credential = await this.credential(state);
-			if (credential !== null) {
+			const client = this.client(state);
+			if (client !== null) {
 				try {
-					await deleteSession(agentClient(credential), state.sessionId);
+					await deleteSession(client, state.sessionId);
 				} catch (error) {
 					this.log("end_failed", state, error);
 					return "failed";
@@ -222,20 +220,17 @@ export class AgentSession extends DurableObject<Env> {
 
 	/** チャンネルが消された(手で消されたか、削除ボタン)。セッションも消し、記録を消す */
 	async channelDeleted(): Promise<void> {
-		await this.discard(null);
+		await this.discard();
 	}
 
 	/** Bobertがサーバーから外された。セッションを消し、記録を消す(チャンネルは残る) */
 	async guildRemoved(): Promise<void> {
-		await this.discard(null);
+		await this.discard();
 	}
 
-	/**
-	 * /delete。セッションとチャンネルを消し、記録を消す。
-	 * 本人のキーはD1から先に消すので、キーは呼び出し元から受け取る
-	 */
-	async purge(credential: AnthropicCredential | null): Promise<void> {
-		const channelId = await this.discard(credential);
+	/** /delete。セッションとチャンネルを消し、記録を消す */
+	async purge(): Promise<void> {
+		const channelId = await this.discard();
 		if (channelId !== null) {
 			await deleteChannel(this.env.DISCORD_BOT_TOKEN, channelId).catch(
 				(error: unknown) => {
@@ -285,14 +280,12 @@ export class AgentSession extends DurableObject<Env> {
 	 * (止まった知らせを受け取り損ねたときに、流れを閉じるため)
 	 */
 	private async settleIfIdle(state: SessionState): Promise<void> {
-		const credential = await this.credential(state);
-		if (credential === null || state.sessionId === null) {
+		const client = this.client(state);
+		if (client === null || state.sessionId === null) {
 			return;
 		}
 		try {
-			const session = await agentClient(credential).beta.sessions.retrieve(
-				state.sessionId,
-			);
+			const session = await client.beta.sessions.retrieve(state.sessionId);
 			if (session.status === "idle" || session.status === "terminated") {
 				this.stopStreaming();
 				await this.relay(state).finishTurn();
@@ -302,10 +295,8 @@ export class AgentSession extends DurableObject<Env> {
 		}
 	}
 
-	/** セッションを消し(キーがあれば)、記録を消す。チャンネルのIDを返す(記録がなければnull) */
-	private async discard(
-		credential: AnthropicCredential | null,
-	): Promise<string | null> {
+	/** セッションを消し(sigwのキーがあれば)、記録を消す。チャンネルのIDを返す(記録がなければnull) */
+	private async discard(): Promise<string | null> {
 		return this.serial(async () => {
 			const state = await this.loadState();
 			if (state === null) {
@@ -313,9 +304,9 @@ export class AgentSession extends DurableObject<Env> {
 			}
 			this.stopStreaming();
 			if (state.sessionId !== null) {
-				const key = credential ?? (await this.credential(state));
-				if (key !== null) {
-					await deleteSession(agentClient(key), state.sessionId).catch(
+				const client = this.client(state);
+				if (client !== null) {
+					await deleteSession(client, state.sessionId).catch(
 						(error: unknown) => {
 							this.log("discard_session_failed", state, error);
 						},
@@ -370,11 +361,10 @@ export class AgentSession extends DurableObject<Env> {
 			if (state === null || state.sessionId === null || !state.working) {
 				return;
 			}
-			const credential = await this.credential(state);
-			if (credential === null) {
+			const client = this.client(state);
+			if (client === null) {
 				return;
 			}
-			const client = agentClient(credential);
 			const stream = await client.beta.sessions.events.stream(
 				state.sessionId,
 				{},
@@ -444,10 +434,7 @@ export class AgentSession extends DurableObject<Env> {
 					editChannelMessage(token, channelId, messageId, body),
 				remove: (messageId) => deleteMessage(token, channelId, messageId),
 			},
-			client: async () => {
-				const credential = await this.credential(state);
-				return credential === null ? null : agentClient(credential);
-			},
+			client: async () => this.client(state),
 			markEnded: () => markAgentChannelEnded(this.env.DB, channelId),
 			fetchAttachment: async (url) => {
 				const response = await fetch(url);
@@ -530,8 +517,14 @@ export class AgentSession extends DurableObject<Env> {
 		return this.uploadLimitBytes;
 	}
 
-	private credential(state: SessionState): Promise<AnthropicCredential | null> {
-		return loadCredential(this.env, state.ownerId, "anthropic");
+	/**
+	 * sigw経由のクライアント。費用は、チャンネルの持ち主(セッションを始めた人)にかかる。
+	 * Bobertにsigwのキーがなければnull
+	 */
+	private client(state: SessionState): Anthropic | null {
+		return agentsAvailable(this.env)
+			? agentClient(this.env, state.ownerId)
+			: null;
 	}
 
 	private startTyping(): void {

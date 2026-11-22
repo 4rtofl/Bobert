@@ -1,12 +1,12 @@
 /**
  * エージェントの記録(D1)。仕様: docs/spec/architecture.md「エージェント」
- * - agent_users: 利用者ごとに、本人のAnthropicのアカウントに作ったエージェントの設定と環境
+ * - agent_users: 利用者ごとに、Bobert専用のワークスペースに作ったエージェントの設定と環境
  * - agent_channels: エージェントのチャンネル(セッションを終えても、チャンネルを消すまで残す)
  * - agent_counters: 人ごと・サーバーごとの、チャンネルの番号
- * - agent_vaults: 利用者ごとに、本人のアカウントに作った、エージェントに渡す秘密のvault
+ * - agent_vaults: 利用者ごとに、Bobert専用のワークスペースに作った、エージェントに渡す秘密のvault
  */
 
-/** 本人のAnthropicのアカウントに作った、Managed Agentsのエージェントの設定と環境 */
+/** Bobert専用のワークスペースに、本人ごとに作った、Managed Agentsのエージェントの設定と環境 */
 export interface AgentResources {
 	agentId: string;
 	environmentId: string;
@@ -276,7 +276,7 @@ export async function deleteAgentRecordsOf(
 	]);
 }
 
-/** 本人のアカウントに作った、エージェントに渡す秘密のvault。なければnull */
+/** 本人ごとに作った、エージェントに渡す秘密のvault。なければnull */
 export async function getAgentVault(
 	db: D1Database,
 	userId: string,

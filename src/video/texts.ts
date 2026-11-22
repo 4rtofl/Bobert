@@ -6,10 +6,6 @@
 /** /feat のボタンの名前 */
 export const VIDEO_FEATURE_LABEL = "動画の作成";
 
-/** /feat で、Anthropicのキーがない人がONにしようとしたとき(ボタンの上の文を置き換える) */
-export const VIDEO_KEY_MISSING =
-	"動画の作成を使うには、AnthropicのAPIキーの登録が必要です(OpenRouterでは使えません)。`/setup` から登録してください。";
-
 /** できたとき(頼んだメッセージへの返信。mp4を添付する) */
 export function videoReadyMessage(speakerName: string): string {
 	return `動画ができました。\n-# AIが会話を要約して作りました。音声: VOICEVOX:${speakerName}`;

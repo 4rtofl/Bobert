@@ -1,12 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { BetaManagedAgentsSessionErrorEvent } from "@anthropic-ai/sdk/resources/beta/sessions/events";
 import { DEFAULT_MODEL_KEY, findModelCandidate } from "../config/models";
-import {
-	type AnthropicCredential,
-	CLAUDE_EFFORTS,
-	createClient,
-	toLlmError,
-} from "../llm/anthropic";
+import { CLAUDE_EFFORTS, toLlmError } from "../llm/anthropic";
+import { sigwAnthropicClient, sigwProviders } from "../llm/sigw";
 import { LlmError, type LlmErrorKind } from "../llm/types";
 import { logEvent } from "../log";
 import { effectiveEffort } from "../respond/effort";
@@ -26,7 +22,8 @@ import {
 
 /**
  * Claude Managed Agentsとのやり取り(仕様: docs/spec/architecture.md「エージェント」)。
- * エージェントの設定と環境は、本人のAnthropicのアカウントに1つずつ作る。
+ * APIは、sigw経由で、Bobert用のsigwのキーで呼ぶ(費用は、x-sigw-user で渡した本人にかかる)。
+ * エージェントの設定と環境は、Bobert専用のワークスペースに、本人ごとに1つずつ作る。
  * モデル、思考の深さ、指示、道具は、セッションを始めるときに、そのセッションだけの設定として渡す
  */
 
@@ -443,8 +440,20 @@ export function agentEffort(
 	return found ?? "low";
 }
 
-export function agentClient(credential: AnthropicCredential): Anthropic {
-	return createClient(credential);
+/**
+ * エージェントと動画の作成を使えるか。Bobertに、Anthropicのsigwのキーがあれば使える(全員で同じ)。
+ * Managed AgentsはClaudeでしか動かないので、OpenRouterのキーでは使えない
+ */
+export function agentsAvailable(env: Env): boolean {
+	return sigwProviders(env).has("anthropic");
+}
+
+/**
+ * Managed AgentsのAPIを、sigw経由で呼ぶクライアント。userIdは、費用を払う人
+ * (エージェントのチャンネルの持ち主か、動画を頼んだ人)のDiscordのID
+ */
+export function agentClient(env: Env, userId: string): Anthropic {
+	return sigwAnthropicClient({ env, userId });
 }
 
 /** セッションを始めるのに使う設定 */
@@ -470,7 +479,7 @@ export interface StartedSession {
 
 /**
  * セッションを始める。エージェントの設定と環境がなければ作る。
- * 記録したものが見つからなければ(別のワークスペースのキーに替えたときなど)、作り直して、もう一度試す。
+ * 記録したものが見つからなければ(sigw経由に替える前に、本人のアカウントに作ったものなど)、作り直して、もう一度試す。
  * リポジトリは、ここでつなぐ(Managed Agentsでは、セッションを作った後には足せない)
  */
 export async function startSession(
@@ -576,7 +585,7 @@ const SETTLE_ATTEMPTS = 20;
 
 /**
  * セッションを消す。動いていれば止めてから消す(動いている間は消せないため)。
- * もう見つからなければ(消えたか、別のワークスペースのキーに替えた)、消せたことにしてfalseを返す
+ * もう見つからなければ(消えたか、sigw経由に替える前に、本人のアカウントで作った)、消せたことにしてfalseを返す
  */
 export async function deleteSession(
 	client: Anthropic,
@@ -608,7 +617,7 @@ export async function deleteSession(
 	}
 }
 
-/** 本人のアカウントに作った環境を消し、エージェントの設定をアーカイブする(設定は消せないため)。見つからなければ何もしない */
+/** 本人のために作った環境を消し、エージェントの設定をアーカイブする(設定は消せないため)。見つからなければ何もしない */
 export async function retireAgentResources(
 	client: Anthropic,
 	resources: AgentResources,
@@ -663,7 +672,7 @@ function resolvedOf(model: AgentModel): ResolvedModel {
 	};
 }
 
-/** セッションが見つからない(消えたか、別のワークスペースのキーに替えた) */
+/** セッションが見つからない(消えたか、sigw経由に替える前に、本人のアカウントで作った) */
 export function isSessionGone(error: unknown): boolean {
 	return error instanceof Anthropic.NotFoundError;
 }

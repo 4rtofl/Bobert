@@ -429,7 +429,7 @@ export interface RelayDiscord {
 
 export interface RelayDeps {
 	discord: RelayDiscord;
-	/** 本人のキーで作ったクライアント。キーが消えていればnull */
+	/** sigw経由のクライアント(費用は本人にかかる)。Bobertにsigwのキーがなければnull */
 	client(): Promise<Anthropic | null>;
 	/** セッションを終えた印を、D1に付ける */
 	markEnded(): Promise<void>;
@@ -1298,7 +1298,7 @@ export class SessionRelay {
 	}
 
 	/**
-	 * 添付ファイルを、本人のAnthropicのアカウントに上げて、サンドボックスに置く。置き場所を返す。
+	 * 添付ファイルを、Bobert専用のワークスペースに上げて、サンドボックスに置く。置き場所を返す。
 	 * 置いたファイルは、セッション用の写しになるので、上げた元のファイルは消す
 	 */
 	private async mount(
@@ -1719,7 +1719,7 @@ export class SessionRelay {
 	}
 
 	/**
-	 * スキルのファイルを、本人のAnthropicのアカウントに上げて、サンドボックスに置く(添付ファイルと同じ)。
+	 * スキルのファイルを、Bobert専用のワークスペースに上げて、サンドボックスに置く(添付ファイルと同じ)。
 	 * このセッションで置いたファイルは、置き直さない(途中で失敗したら、次に読んだときに残りを置く)
 	 */
 	private async mountSkillFiles(
@@ -1761,7 +1761,7 @@ export class SessionRelay {
 		}
 	}
 
-	/** スキルのファイルを1つ、本人のAnthropicのアカウントに上げて、サンドボックスに置く */
+	/** スキルのファイルを1つ、Bobert専用のワークスペースに上げて、サンドボックスに置く */
 	private async mountSkillFile(
 		client: Anthropic,
 		sessionId: string,
