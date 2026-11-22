@@ -64,8 +64,8 @@ import {
 	MAX_KNOWLEDGE_CHUNKS,
 } from "../src/knowledge/vectors";
 import { clearModelInfoCache } from "../src/llm/model-info";
-import type { OwnKeyModel } from "../src/llm/own-key";
 import { type ChatResult, LlmError } from "../src/llm/types";
+import type { UserModel } from "../src/llm/user-model";
 import { applyChannelSync } from "../src/queue/channels";
 import { type JobHandlers, processBatch } from "../src/queue/consumer";
 import { deleteMessages, ingestMessages } from "../src/queue/ingest";
@@ -103,6 +103,8 @@ import {
 	fakeIngestDeps,
 	guildInteraction,
 	mockFetch,
+	noSigwEnv,
+	openRouterOnlyEnv,
 	recordChannels,
 	sendInteraction,
 	userFactory,
@@ -763,7 +765,10 @@ describe("文字にして要約する仕事", () => {
 			return Response.json({ id: newId() });
 		});
 
-		await handleKnowledgeJob(job(file as KnowledgeFile), jobEnv(ai).env);
+		await handleKnowledgeJob(
+			job(file as KnowledgeFile),
+			openRouterOnlyEnv(jobEnv(ai).env),
+		);
 
 		expect(seen).toEqual([]);
 		const request = calls.find(
@@ -810,7 +815,7 @@ describe("文字にして要約する仕事", () => {
 		});
 	});
 
-	it("送った人がキーを登録していなければ、変換も要約もせず、メッセージごとに1回だけ返信で知らせる", async () => {
+	it("要約のモデルを呼べなければ(Bobertにsigwのキーがない)、変換も要約もせず、メッセージごとに1回だけ返信で知らせる", async () => {
 		const { guildId, channelId } = await knowledgeGuild();
 		const user = await userWith();
 		const message = storedMessage(
@@ -824,7 +829,7 @@ describe("文字にして要約する仕事", () => {
 		const calls = mockServices();
 
 		for (const file of files) {
-			await handleKnowledgeJob(job(file), jobEnv(ai).env);
+			await handleKnowledgeJob(job(file), noSigwEnv(jobEnv(ai).env));
 		}
 
 		expect(seen).toEqual([]);
@@ -1200,7 +1205,7 @@ describe("文字にして要約する仕事", () => {
 describe("やり直しと、知らせ方", () => {
 	/** 仕事に使うものの偽物 */
 	function fakeDeps(
-		call: OwnKeyModel["call"],
+		call: UserModel["call"],
 		overrides: Partial<KnowledgeJobDeps> = {},
 	) {
 		const replied: string[] = [];
@@ -1420,7 +1425,7 @@ describe("PowerPoint", () => {
 
 	/** 仕事に使うものの偽物。PowerPointは、pdfの結果でPDFにし、PDFは「スライド1」の文字にする */
 	function pptxDeps(
-		options: { pdf?: PdfConversion; call?: OwnKeyModel["call"] } = {},
+		options: { pdf?: PdfConversion; call?: UserModel["call"] } = {},
 	) {
 		const replied: string[] = [];
 		const markdown: { name: string; type: string }[] = [];
@@ -2095,7 +2100,10 @@ describe("返答で知識を使う", () => {
 		const trigger = mention(user, channelId);
 		const calls = mockApis(trigger, () => openRouterChat("月500円です!"));
 
-		await handleRespondJob(respondJob(trigger, guildId), testEnv);
+		await handleRespondJob(
+			respondJob(trigger, guildId),
+			openRouterOnlyEnv(testEnv),
+		);
 
 		const request = openRouterRequest(calls);
 		expect(request.messages[0]).toEqual({
@@ -2155,7 +2163,10 @@ describe("返答で知識を使う", () => {
 		mockApis(trigger, () => openRouterChat("月500円です!"));
 		const logs = vi.spyOn(console, "log").mockImplementation(() => {});
 
-		await handleRespondJob(respondJob(trigger, guildId), testEnv);
+		await handleRespondJob(
+			respondJob(trigger, guildId),
+			openRouterOnlyEnv(testEnv),
+		);
 
 		const responded = logs.mock.calls
 			.map(([line]) => JSON.parse(String(line)))
@@ -2175,7 +2186,10 @@ describe("返答で知識を使う", () => {
 		const trigger = mention(user, channelId);
 		const calls = mockApis(trigger, () => openRouterChat("こんにちは!"));
 
-		await handleRespondJob(respondJob(trigger, guildId), testEnv);
+		await handleRespondJob(
+			respondJob(trigger, guildId),
+			openRouterOnlyEnv(testEnv),
+		);
 
 		const request = openRouterRequest(calls);
 		expect(request.messages[0]).toEqual({

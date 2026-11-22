@@ -3,12 +3,12 @@ import type {
 	APISelectMenuOption,
 } from "discord-api-types/v10";
 import { ComponentType } from "../discord/constants";
+import { sigwProviders } from "../llm/sigw";
 import { logEvent } from "../log";
 import { availableEfforts, effectiveEffort } from "../respond/effort";
 import { type ResolvedModel, resolveModel } from "../respond/model";
-import { setupGuidance } from "../respond/replies";
+import { modelUnavailableText } from "../respond/replies";
 import {
-	getRegisteredProviders,
 	getUserSettings,
 	type UserSettings,
 	updateUserSettings,
@@ -74,13 +74,10 @@ export function selectEffort(
 }
 
 async function effortMenu(env: Env, userId: string): Promise<MessageEdit> {
-	const [providers, settings] = await Promise.all([
-		getRegisteredProviders(env.DB, userId),
-		getUserSettings(env.DB, userId),
-	]);
-	const resolution = resolveModel(settings, providers);
+	const settings = await getUserSettings(env.DB, userId);
+	const resolution = resolveModel(settings, sigwProviders(env));
 	if (!resolution.ok) {
-		return { content: setupGuidance(resolution), components: [] };
+		return { content: modelUnavailableText(resolution), components: [] };
 	}
 	const levels = await availableEfforts(
 		env,
@@ -96,13 +93,10 @@ async function applyEffort(
 	userId: string,
 	value: string,
 ): Promise<MessageEdit> {
-	const [providers, settings] = await Promise.all([
-		getRegisteredProviders(env.DB, userId),
-		getUserSettings(env.DB, userId),
-	]);
-	const resolution = resolveModel(settings, providers);
+	const settings = await getUserSettings(env.DB, userId);
+	const resolution = resolveModel(settings, sigwProviders(env));
 	if (!resolution.ok) {
-		return { content: setupGuidance(resolution), components: [] };
+		return { content: modelUnavailableText(resolution), components: [] };
 	}
 	const levels = await availableEfforts(
 		env,

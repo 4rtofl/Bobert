@@ -1,7 +1,7 @@
 {
 	"name": "bobert",
 	"private": true,
-	"description": "Discord上でAIと会話できるBot。LLMの費用は各ユーザーが自分のキーで負担する。",
+	"description": "Discord上でAIと会話できるBot。LLMの呼び出しはsigwを通し、費用は返答を頼んだ人が負担する。",
 	"type": "module",
 	"packageManager": "pnpm@12.15.0",
 	"engines": {

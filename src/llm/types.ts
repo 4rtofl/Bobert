@@ -157,6 +157,11 @@ export class LlmError extends Error {
 		message: string,
 		/** 原因の調査のための説明(describeErrorで作る)。ステータスが分からない失敗のときに付ける */
 		readonly detail: string | null = null,
+		/**
+		 * sigw自身が断ったときの、sigwのエラーの文(「[sigw] 」で始まる)。本人には、理由としてこの文を見せる。
+		 * sigwを通さなかったか、プロバイダが断ったときはnull
+		 */
+		readonly sigwMessage: string | null = null,
 	) {
 		super(message);
 		this.name = "LlmError";

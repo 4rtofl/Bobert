@@ -27,6 +27,7 @@ import {
 	type FetchCall,
 	guildInteraction,
 	mockFetch,
+	noSigwEnv,
 	sendInteraction,
 } from "./helpers";
 
@@ -370,17 +371,17 @@ describe("要約の仕事", () => {
 		).toEqual([]);
 	});
 
-	it("キーを登録していなければ、登録方法を伝える", async () => {
+	it("Bobertにsigwのキーがなければ、AIを呼び出せないことを伝える", async () => {
 		const calls = mockApis([], summaryAi);
 
 		await handleCompactJob(
 			compactJob("172", discordMessage("7900", ALICE, "要約して"), null),
-			env,
+			noSigwEnv(),
 		);
 
 		const [edit] = edits(calls);
 		const body = edit?.body as { content: string } | undefined;
-		expect(body?.content).toContain("`/setup`");
+		expect(body?.content).toContain("Bobertの管理者");
 	});
 
 	it("AIに断られたら、そう伝えて、案内のボタンは残す", async () => {

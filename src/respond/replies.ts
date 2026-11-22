@@ -1,3 +1,4 @@
+import { AI_UNAVAILABLE_TEXT } from "../llm/sigw";
 import type { ChatResult, LlmError } from "../llm/types";
 import { MEMORY_UPDATED_NOTE } from "../memory/texts";
 import type { Provider } from "../store/users";
@@ -6,18 +7,21 @@ import type { ModelResolution, ResolvedModel } from "./model";
 import { formatCost } from "./usage";
 import { sourcesNote } from "./web-search";
 
-/** キーを登録していない人などへの、登録方法の案内(仕様: docs/spec/architecture.md「決定事項」) */
-export function setupGuidance(
+/**
+ * モデルを呼べないときの知らせ(仕様: docs/spec/llm-cost.md「AIの呼び出しと費用の負担」)。
+ * Bobertに、そのプロバイダのsigwのキーがない。どのキーもなければ、管理者に知らせてもらう
+ */
+export function modelUnavailableText(
 	resolution: Extract<ModelResolution, { ok: false }>,
 ): string {
-	switch (resolution.missing) {
-		case "credentials":
-			return "Bobertと話すには、AIのキーの登録が必要です。`/setup` から、AnthropicのAPIキーを登録するか、OpenRouterと連携してください。費用は、登録した本人のアカウントに請求されます。";
-		case "anthropic":
-			return `モデル「${resolution.label}」を使うには、AnthropicのAPIキーの登録が必要です。\`/setup\` から登録してください。`;
-		case "openrouter":
-			return `モデル「${resolution.label}」を使うには、OpenRouterとの連携が必要です。\`/setup\` から連携してください。`;
-	}
+	return resolution.missing === "credentials"
+		? AI_UNAVAILABLE_TEXT
+		: modelNotFoundText(resolution.label);
+}
+
+/** モデルが見つからないか、使えないときの知らせ */
+function modelNotFoundText(label: string): string {
+	return `モデル「${label}」が見つからないか、いまは使えません。`;
 }
 
 /**
@@ -48,6 +52,10 @@ export function describeLlmError(
 	error: LlmError,
 	model: ResolvedModel,
 ): string {
+	// sigw自身が断ったときは(上限額に達した、など)、sigwの文で理由を伝える
+	if (error.sigwMessage !== null) {
+		return error.sigwMessage;
+	}
 	const anthropic = model.provider === "anthropic";
 	switch (error.kind) {
 		case "invalid_key":
@@ -59,7 +67,7 @@ export function describeLlmError(
 		case "forbidden":
 			return "このキーではモデルを使えないか、提供元に内容を断られました。";
 		case "model_not_found":
-			return `モデル「${model.label}」が見つからないか、いまは使えません。`;
+			return modelNotFoundText(model.label);
 		case "no_provider":
 			return `モデル「${model.label}」は、データを学習に使わない提供元では使えません。別のモデルを選んでください。`;
 		case "rate_limited":

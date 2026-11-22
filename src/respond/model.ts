@@ -23,15 +23,15 @@ export type ModelResolution =
 	| { ok: true; model: ResolvedModel }
 	| {
 			ok: false;
-			/** 何が足りないか。返信で登録方法を案内する */
+			/** 何が足りないか(Bobertにない、sigwのキー)。credentialsは、どのキーもないとき */
 			missing: "credentials" | "anthropic" | "openrouter";
 			label: string;
 	  };
 
 /**
- * 本人の設定と登録済みの資格情報から、使うモデルと呼び出し先を決める
+ * 本人の設定と、使えるプロバイダ(Bobertにあるsigwのキー)から、使うモデルと呼び出し先を決める
  * (仕様: docs/spec/llm-cost.md「モデルの候補」)。
- * Claudeは、Anthropicのキーがあれば直接呼び(Max/Teamの付属クレジットが使える)、なければOpenRouter経由で呼ぶ。
+ * Claudeは、Anthropicのキーがあれば直接呼び、なければOpenRouter経由で呼ぶ。
  */
 export function resolveModel(
 	settings: UserSettings,
@@ -95,7 +95,7 @@ export function selectedCandidate(
 	return candidate;
 }
 
-/** 登録した資格情報で使える候補。Claudeは、AnthropicのキーかOpenRouterのどちらかがあれば使える */
+/** 使えるプロバイダで呼べる候補。Claudeは、AnthropicかOpenRouterのどちらかのキーがあれば使える */
 export function availableCandidates(
 	providers: ReadonlySet<Provider>,
 ): ModelCandidate[] {

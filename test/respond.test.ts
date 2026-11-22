@@ -21,7 +21,13 @@ import {
 	discordMessage,
 	discordReply,
 } from "./fixtures";
-import { anthropicStreamOf, type FetchCall, mockFetch } from "./helpers";
+import {
+	anthropicStreamOf,
+	type FetchCall,
+	mockFetch,
+	noSigwEnv,
+	openRouterOnlyEnv,
+} from "./helpers";
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -209,16 +215,18 @@ const CAT_IMAGE: APIAttachment = {
 };
 
 describe("メンションと返信への応答", () => {
-	it("キーを登録していない人には、登録方法を返信する", async () => {
+	it("Bobertにsigwのキーがなければ、AIを呼び出せないことを返信する", async () => {
 		const trigger = discordMessage("5001", BOB, `<@${BOT.id}> こんにちは`, {
 			mentions: [BOT],
 		});
 		const calls = mockApis([trigger]);
 
-		await handleRespondJob(respondJob(trigger), testEnv);
+		await handleRespondJob(respondJob(trigger), noSigwEnv(testEnv));
 
 		const [reply] = posted(calls);
-		expect(reply?.content).toContain("`/setup`");
+		expect(reply?.content).toBe(
+			"いまはAIを呼び出せません。Bobertの管理者に知らせてください。",
+		);
 		expect(reply?.message_reference.message_id).toBe(trigger.id);
 		expect(reply?.allowed_mentions).toEqual({ parse: [], replied_user: true });
 	});
@@ -235,12 +243,8 @@ describe("メンションと返信への応答", () => {
 		expect(posted(calls)).toHaveLength(1);
 	});
 
-	it("返信のつながりを会話としてAIに渡し、返答を返信する", async () => {
+	it("キーを登録していなくても、返信のつながりを会話として、頼んだ人の分としてsigw経由でAIに渡し、返答を返信する", async () => {
 		const user = { ...ALICE, id: "110" };
-		await saveCredential(env, user.id, "anthropic", {
-			apiKey: "sk-ant-test",
-			workspaceId: null,
-		});
 		const first = discordMessage("5010", user, `<@${BOT.id}> やあ`, {
 			mentions: [BOT],
 		});
@@ -258,7 +262,8 @@ describe("メンションと返信への応答", () => {
 			(call) => call.url.hostname === "api.anthropic.com",
 		);
 		expect(request?.url.pathname).toBe("/v1/messages");
-		expect(request?.headers.get("authorization")).toBe("Bearer sk-ant-test");
+		expect(request?.headers.get("x-api-key")).toBe("sgk-anthropic-test");
+		expect(request?.headers.get("x-sigw-user")).toBe(user.id);
 		expect(request?.body).toMatchObject({
 			model: "claude-haiku-5-5",
 			stream: true,
@@ -275,7 +280,7 @@ describe("メンションと返信への応答", () => {
 		expect(posted(calls).map((reply) => reply.content)).toEqual(["元気だよ!"]);
 	});
 
-	it("ワークスペースIDを登録した人のキーでは、ワークスペースをヘッダーで指定する", async () => {
+	it("登録したキーがあっても、sigwのキーで呼び、ワークスペースは指定しない", async () => {
 		const user = { ...ALICE, id: "113" };
 		await saveCredential(env, user.id, "anthropic", {
 			apiKey: "sk-ant-usr-test",
@@ -291,9 +296,8 @@ describe("メンションと返信への応答", () => {
 		const request = calls.find(
 			(call) => call.url.hostname === "api.anthropic.com",
 		);
-		expect(request?.headers.get("anthropic-workspace-id")).toBe(
-			"wrkspc_01TEST",
-		);
+		expect(request?.headers.get("x-api-key")).toBe("sgk-anthropic-test");
+		expect(request?.headers.get("anthropic-workspace-id")).toBeNull();
 		expect(posted(calls)[0]?.content).toBe("こんにちは!");
 	});
 
@@ -404,10 +408,6 @@ describe("メンションと返信への応答", () => {
 
 	it("OpenRouterの残高が足りないときは、理由を返信する", async () => {
 		const user = { ...ALICE, id: "112" };
-		await saveCredential(env, user.id, "openrouter", {
-			apiKey: "sk-or-test",
-			workspaceId: null,
-		});
 		const trigger = discordMessage("5030", user, `<@${BOT.id}> こんにちは`, {
 			mentions: [BOT],
 		});
@@ -418,14 +418,66 @@ describe("メンションと返信への応答", () => {
 			),
 		);
 
-		await handleRespondJob(respondJob(trigger), testEnv);
+		await handleRespondJob(respondJob(trigger), openRouterOnlyEnv(testEnv));
 
 		const request = calls.find((call) => call.url.hostname === "openrouter.ai");
 		expect(request?.body).toMatchObject({
 			model: "anthropic/claude-haiku-5.5",
 			provider: { data_collection: "deny" },
 		});
+		expect(request?.headers.get("authorization")).toBe(
+			"Bearer sgk-openrouter-test",
+		);
+		expect(request?.headers.get("x-sigw-user")).toBe(user.id);
 		expect(posted(calls)[0]?.content).toContain("OpenRouterの残高が不足");
+	});
+
+	it("sigwが断ったときは、sigwの文を、そのまま理由として返信する", async () => {
+		const user = { ...ALICE, id: "115" };
+		const trigger = discordMessage("5031", user, `<@${BOT.id}> こんにちは`, {
+			mentions: [BOT],
+		});
+		const calls = mockApis([trigger], () =>
+			Response.json(
+				{
+					type: "error",
+					error: {
+						type: "rate_limit_error",
+						message: "[sigw] sigw キーの今月の上限額に達しました",
+					},
+				},
+				{ status: 429 },
+			),
+		);
+
+		await handleRespondJob(respondJob(trigger), testEnv);
+
+		expect(posted(calls)[0]?.content).toBe(
+			"[sigw] sigw キーの今月の上限額に達しました",
+		);
+	});
+
+	it("OpenRouter経由でも、sigwが断ったときは、sigwの文を理由として返信する", async () => {
+		const user = { ...ALICE, id: "116" };
+		const trigger = discordMessage("5032", user, `<@${BOT.id}> こんにちは`, {
+			mentions: [BOT],
+		});
+		const calls = mockApis([trigger], () =>
+			Response.json(
+				{
+					error: {
+						message: "[sigw] sigw キーが無効です",
+						type: "authentication_error",
+						code: "authentication_error",
+					},
+				},
+				{ status: 401 },
+			),
+		);
+
+		await handleRespondJob(respondJob(trigger), openRouterOnlyEnv(testEnv));
+
+		expect(posted(calls)[0]?.content).toBe("[sigw] sigw キーが無効です");
 	});
 
 	it("「その他」で選んだOpenRouterのモデルが画像を読めるなら、画像を渡す", async () => {
@@ -664,10 +716,6 @@ describe("メンションと返信への応答", () => {
 
 	it("OpenRouter経由なら、利用量の表示に、応答に含まれる費用を使う", async () => {
 		const user = { ...ALICE, id: "123" };
-		await saveCredential(env, user.id, "openrouter", {
-			apiKey: "sk-or-test",
-			workspaceId: null,
-		});
 		await updateUserSettings(env.DB, user.id, { featUsageDisplay: true });
 		const trigger = discordMessage("5110", user, `<@${BOT.id}> こんにちは`, {
 			mentions: [BOT],
@@ -686,7 +734,7 @@ describe("メンションと返信への応答", () => {
 			}),
 		);
 
-		await handleRespondJob(respondJob(trigger), testEnv);
+		await handleRespondJob(respondJob(trigger), openRouterOnlyEnv(testEnv));
 
 		expect(posted(calls)[0]?.content).toBe(
 			"こんにちは!\n-# 入力 1,200トークン(うちキャッシュ 1,000)・出力 30トークン・約$0.00012",
@@ -695,10 +743,6 @@ describe("メンションと返信への応答", () => {
 
 	it("Web検索をONにしていれば、検索の道具を渡し、引用したページを出典として添える", async () => {
 		const user = { ...ALICE, id: "124" };
-		await saveCredential(env, user.id, "openrouter", {
-			apiKey: "sk-or-test",
-			workspaceId: null,
-		});
 		await updateUserSettings(env.DB, user.id, { featWebSearch: true });
 		const trigger = discordMessage("5120", user, `<@${BOT.id}> 今日の天気は?`, {
 			mentions: [BOT],
@@ -723,7 +767,7 @@ describe("メンションと返信への応答", () => {
 			}),
 		);
 
-		await handleRespondJob(respondJob(trigger), testEnv);
+		await handleRespondJob(respondJob(trigger), openRouterOnlyEnv(testEnv));
 
 		const request = calls.find(
 			(call) => call.url.pathname === "/api/v1/chat/completions",
@@ -790,7 +834,7 @@ describe("メンションと返信への応答", () => {
 		);
 		const calls = mockApis([trigger], () => openRouterChat("作れないよ"));
 
-		await handleRespondJob(respondJob(trigger), testEnv);
+		await handleRespondJob(respondJob(trigger), openRouterOnlyEnv(testEnv));
 
 		const request = calls.find(
 			(call) => call.url.pathname === "/api/v1/chat/completions",
@@ -839,10 +883,6 @@ describe("メンションと返信への応答", () => {
 
 	it("会話の最初のメッセージが返信なら、返信先を読む道具を渡し、AIが呼んだら返信先を読む", async () => {
 		const user = { ...ALICE, id: "126" };
-		await saveCredential(env, user.id, "openrouter", {
-			apiKey: "sk-or-test",
-			workspaceId: null,
-		});
 		// 返信先が消えているので、返信のつながりはこのメッセージだけになる
 		const deleted = discordMessage("5139", BOB, "消されたメッセージ");
 		const trigger = discordReply(
@@ -878,7 +918,7 @@ describe("メンションと返信への応答", () => {
 				: openRouterChat("返信先は読めなかったよ。"),
 		);
 
-		await handleRespondJob(respondJob(trigger), testEnv);
+		await handleRespondJob(respondJob(trigger), openRouterOnlyEnv(testEnv));
 
 		const requests = calls
 			.filter((call) => call.url.pathname === "/api/v1/chat/completions")
@@ -926,16 +966,12 @@ describe("メンションと返信への応答", () => {
 
 	it("会話の最初のメッセージが返信でなければ、返信先を読む道具は渡さない(時系列で読む道具、意味で検索する道具、チャンネルの一覧の道具、ファイルを読む道具だけ)", async () => {
 		const user = { ...ALICE, id: "127" };
-		await saveCredential(env, user.id, "openrouter", {
-			apiKey: "sk-or-test",
-			workspaceId: null,
-		});
 		const trigger = discordMessage("5150", user, `<@${BOT.id}> こんにちは`, {
 			mentions: [BOT],
 		});
 		const calls = mockApis([trigger], () => openRouterChat("こんにちは!"));
 
-		await handleRespondJob(respondJob(trigger), testEnv);
+		await handleRespondJob(respondJob(trigger), openRouterOnlyEnv(testEnv));
 
 		const request = calls.find(
 			(call) => call.url.pathname === "/api/v1/chat/completions",
@@ -1181,7 +1217,7 @@ describe("音声メッセージ", () => {
 		).toBe("明日の午後3時から部室で集まろう");
 	});
 
-	it("キーも使える寄付もない人の音声メッセージは、文字にせず、登録方法を返信する", async () => {
+	it("AIを呼び出せないときは、音声メッセージを文字にせず、そのことを返信する", async () => {
 		const answer = discordMessage("5910", BOT, "やあ!");
 		const trigger = discordReply("5911", BOB, "", answer, {
 			referenced_message: answer,
@@ -1191,9 +1227,9 @@ describe("音声メッセージ", () => {
 		const calls = mockApis([answer, trigger]);
 		const voice = voiceEnv("使われない");
 
-		await handleRespondJob(respondJob(trigger), voice.env);
+		await handleRespondJob(respondJob(trigger), noSigwEnv(voice.env));
 
 		expect(voice.run).not.toHaveBeenCalled();
-		expect(posted(calls)[0]?.content).toContain("`/setup`");
+		expect(posted(calls)[0]?.content).toContain("Bobertの管理者");
 	});
 });

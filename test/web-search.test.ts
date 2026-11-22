@@ -3,13 +3,11 @@ import { chatWithAnthropic } from "../src/llm/anthropic";
 import { chatWithOpenRouter } from "../src/llm/openrouter";
 import type { ChatRequest } from "../src/llm/types";
 import { sourcesNote } from "../src/respond/web-search";
-import { anthropicStreamOf, citation, mockFetch } from "./helpers";
+import { anthropicStreamOf, citation, mockFetch, TEST_CALLER } from "./helpers";
 
 afterEach(() => {
 	vi.restoreAllMocks();
 });
-
-const CREDENTIAL = { apiKey: "sk-ant-test", workspaceId: null };
 
 function request(model: string, webSearch: boolean): ChatRequest {
 	return {
@@ -34,7 +32,7 @@ describe("Web検索(Anthropic)", () => {
 			anthropicStreamOf([{ type: "text", text: "こんにちは" }]),
 		);
 
-		await chatWithAnthropic(CREDENTIAL, request("claude-haiku-5-5", true));
+		await chatWithAnthropic(TEST_CALLER, request("claude-haiku-5-5", true));
 
 		expect(calls[0]?.body).toMatchObject({
 			tools: [
@@ -57,7 +55,7 @@ describe("Web検索(Anthropic)", () => {
 			anthropicStreamOf([{ type: "text", text: "こんにちは" }]),
 		);
 
-		await chatWithAnthropic(CREDENTIAL, request("claude-sonnet-5-5", true));
+		await chatWithAnthropic(TEST_CALLER, request("claude-sonnet-5-5", true));
 
 		expect(calls[0]?.body).toMatchObject({
 			tools: [{ type: "web_search_20260209", name: "web_search" }],
@@ -69,7 +67,7 @@ describe("Web検索(Anthropic)", () => {
 			anthropicStreamOf([{ type: "text", text: "こんにちは" }]),
 		);
 
-		await chatWithAnthropic(CREDENTIAL, request("claude-haiku-5-5", false));
+		await chatWithAnthropic(TEST_CALLER, request("claude-haiku-5-5", false));
 
 		expect(calls[0]?.body).not.toHaveProperty("tools");
 	});
@@ -103,7 +101,7 @@ describe("Web検索(Anthropic)", () => {
 		);
 
 		const result = await chatWithAnthropic(
-			CREDENTIAL,
+			TEST_CALLER,
 			request("claude-haiku-5-5", true),
 		);
 
@@ -132,7 +130,7 @@ describe("Web検索(Anthropic)", () => {
 		);
 
 		const result = await chatWithAnthropic(
-			CREDENTIAL,
+			TEST_CALLER,
 			request("claude-haiku-5-5", true),
 		);
 
@@ -188,7 +186,7 @@ describe("Web検索(OpenRouter)", () => {
 		);
 
 		const result = await chatWithOpenRouter(
-			"sk-or-test",
+			TEST_CALLER,
 			request("openai/gpt-6-luna", true),
 		);
 
@@ -213,7 +211,7 @@ describe("Web検索(OpenRouter)", () => {
 			}),
 		);
 
-		await chatWithOpenRouter("sk-or-test", request("openai/gpt-6-luna", false));
+		await chatWithOpenRouter(TEST_CALLER, request("openai/gpt-6-luna", false));
 
 		expect(calls[0]?.body).not.toHaveProperty("tools");
 		expect(calls[0]?.body).not.toHaveProperty("max_tool_calls");

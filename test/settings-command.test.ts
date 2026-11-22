@@ -15,6 +15,7 @@ import {
 	guildInteraction,
 	mockFetch,
 	mockModelApis,
+	noSigwEnv,
 	sendInteraction,
 	userFactory,
 } from "./helpers";
@@ -134,7 +135,7 @@ describe("/settings", () => {
 		expect(lines(calls)).toContain("- 思考の深さ: このモデルでは選べません");
 	});
 
-	it("キーを登録していなければ、モデルを使うには登録が必要だと書く", async () => {
+	it("キーを登録していなくても、Bobertのsigwのキーで呼ぶモデルを書く", async () => {
 		const calls = mockModelApis([]);
 
 		await sendInteraction(settingsCommand(await userWith()));
@@ -144,7 +145,20 @@ describe("/settings", () => {
 				"- Anthropic: 未登録",
 				"- OpenRouter: 未連携",
 				"- TypeSafe: 未登録",
-				"- モデル: Claude Haiku 5.5(`/setup`で登録が必要)",
+				"- モデル: Claude Haiku 5.5(Anthropicで直接呼ぶ)",
+				"- 思考の深さ: low(既定)",
+			]),
+		);
+	});
+
+	it("Bobertにsigwのキーがなければ、モデルは使えないと書く", async () => {
+		const calls = mockModelApis([]);
+
+		await sendInteraction(settingsCommand(await userWith()), noSigwEnv());
+
+		expect(lines(calls)).toEqual(
+			expect.arrayContaining([
+				"- モデル: Claude Haiku 5.5(いまは使えません)",
 				"- 思考の深さ: low(既定)",
 			]),
 		);

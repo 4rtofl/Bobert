@@ -23,9 +23,17 @@
 			// エージェントのGitHubとの連携に使う、Bobert用のGitHub App(docs/setup.md「GitHub App」)
 			"GITHUB_APP_CLIENT_ID",
 			"GITHUB_APP_CLIENT_SECRET",
-			"GITHUB_APP_SLUG"
+			"GITHUB_APP_SLUG",
+			// AIの呼び出しに使う、Bobert用のsigwのキー(docs/setup.md「sigw」)。空にしたプロバイダのモデルは使えない
+			"SIGW_ANTHROPIC_KEY",
+			"SIGW_OPENROUTER_KEY"
 		]
 	},
+	// AIの呼び出しを中継するsigw(4rtofl/si-gateway)のWorker。Service Bindingで、Bobert用の入口を呼ぶ
+	// (仕様: docs/spec/llm-cost.md「AIの呼び出しと費用の負担」)
+	"services": [
+		{ "binding": "SIGW", "service": "sigw", "entrypoint": "BobertGateway" }
+	],
 	// Discord Gatewayへの常時接続を持つDurable Objectと、/importの進み具合を見張るDurable Object、
 	// エージェントのチャンネルごとに、Managed Agentsのセッションとのやり取りを受け持つDurable Object、
 	// 知識チャンネルのPowerPointをPDFにするコンテナ(下のcontainers)を動かすDurable Object、
@@ -121,9 +129,14 @@
 					"CREDENTIAL_ENCRYPTION_KEYS",
 					"GITHUB_APP_CLIENT_ID",
 					"GITHUB_APP_CLIENT_SECRET",
-					"GITHUB_APP_SLUG"
+					"GITHUB_APP_SLUG",
+					"SIGW_ANTHROPIC_KEY",
+					"SIGW_OPENROUTER_KEY"
 				]
 			},
+			"services": [
+				{ "binding": "SIGW", "service": "sigw", "entrypoint": "BobertGateway" }
+			],
 			"durable_objects": {
 				"bindings": [
 					{ "name": "GATEWAY", "class_name": "Gateway" },

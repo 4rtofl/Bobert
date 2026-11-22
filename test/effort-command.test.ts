@@ -15,6 +15,7 @@ import {
 	guildInteraction,
 	mockFetch,
 	mockModelApis,
+	noSigwEnv,
 	sendInteraction,
 	userFactory,
 } from "./helpers";
@@ -77,13 +78,13 @@ describe("/effort", () => {
 		});
 	});
 
-	it("キーを登録していなければ、登録を案内する", async () => {
+	it("Bobertにsigwのキーがなければ、AIを呼び出せないことを伝える", async () => {
 		const calls = mockModelApis([]);
 
-		await sendInteraction(effortCommand(await userWith()));
+		await sendInteraction(effortCommand(await userWith()), noSigwEnv());
 
 		expect(editedMessage(calls)).toEqual({
-			content: expect.stringContaining("`/setup`"),
+			content: expect.stringContaining("Bobertの管理者"),
 			components: [],
 		});
 	});
@@ -234,7 +235,7 @@ describe("/effort", () => {
 		});
 	});
 
-	it("「その他」のClaudeは、本人のキーで、Anthropicのモデル情報から作る", async () => {
+	it("「その他」のClaudeは、sigw経由で、Anthropicのモデル情報から作る", async () => {
 		const user = await userWith("anthropic");
 		await updateUserSettings(env.DB, user.id, {
 			modelKey: "custom",
@@ -256,7 +257,8 @@ describe("/effort", () => {
 		const check = calls.find(
 			(call) => call.url.hostname === "api.anthropic.com",
 		);
-		expect(check?.headers.get("authorization")).toBe("Bearer key-anthropic");
+		expect(check?.headers.get("x-api-key")).toBe("sgk-anthropic-test");
+		expect(check?.headers.get("x-sigw-user")).toBe(user.id);
 		expect(
 			menuOptions(calls).map((option: { value: string }) => option.value),
 		).toEqual(["low", "medium", "high", "max"]);

@@ -60,6 +60,7 @@ import {
 	fakeIngestDeps,
 	guildInteraction,
 	mockFetch,
+	noSigwEnv,
 	recordChannels,
 	sendInteraction,
 	userFactory,
@@ -244,10 +245,13 @@ describe("/memory の画面", () => {
 		expect(lines.slice(-2)).toEqual(["…", `-# 最後の更新: ${formatJst(1)}`]);
 	});
 
-	it("キーがない人が「ONにする」を押したら、登録を案内し、ONにしない", async () => {
+	it("Bobertにsigwのキーがなければ、「ONにする」を押しても、ONにしない", async () => {
 		const user = await userWith();
 
-		const body = await sendInteraction(pressButton(user, "memory:on"));
+		const body = await sendInteraction(
+			pressButton(user, "memory:on"),
+			noSigwEnv(),
+		);
 
 		expect(body).toEqual({
 			type: InteractionResponseType.ChannelMessageWithSource,
@@ -685,12 +689,12 @@ describe("記憶をまとめる仕事", () => {
 		expect(edit?.body).toEqual(memoryScreen(state));
 	});
 
-	it("キーがなくなっていたら、登録が必要なことを記録する", async () => {
+	it("Bobertにsigwのキーがなければ、まとめられないことを記録する", async () => {
 		const user = await userWith();
 		await setMemoryEnabled(env.DB, user.id, GUILD_ID, true);
 		mockFetch(() => new Response(null, { status: 500 }));
 
-		await handleMemoryJob(job(user.id), env);
+		await handleMemoryJob(job(user.id), noSigwEnv());
 
 		expect(await loadMemory(env.DB, user.id, GUILD_ID)).toMatchObject({
 			failure: MEMORY_KEY_REQUIRED,

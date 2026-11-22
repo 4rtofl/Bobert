@@ -4,6 +4,7 @@ import {
 	MAX_TOOL_CALLS,
 	MAX_WEB_SEARCHES,
 } from "../config/models";
+import { type SigwCaller, sigwErrorMessage, sigwOpenRouterFetch } from "./sigw";
 import {
 	countsTowardLimit,
 	FILES_REJECTED,
@@ -25,6 +26,7 @@ import {
 	type TokenUsage,
 } from "./types";
 
+/** OpenRouterのAPI。返答などはsigwを通すので、ここで直接呼ぶのは、OAuthでのキーの交換だけ */
 const OPENROUTER_API_BASE = "https://openrouter.ai/api/v1";
 
 /** OpenRouterのサイトでの、アプリの表示(任意のヘッダー) */
@@ -34,7 +36,7 @@ const APP_HEADERS = {
 };
 
 interface OpenRouterError {
-	code?: number;
+	code?: number | string;
 	message?: string;
 }
 
@@ -116,13 +118,13 @@ interface ToolCall {
 }
 
 /**
- * ユーザーのOpenRouterのキーで、モデルを呼ぶ。
+ * sigw経由で、OpenRouterのモデルを呼ぶ。費用は、callerの人にかかる。
  * 会話には他の人の発言も含まれるので、データを保存・学習しない提供元だけを使う
  * (仕様: docs/spec/llm-cost.md「対応する資格情報」)。
  * Bobertの道具をAIが呼んだら、実行して結果を返し、続きを頼む。呼び出しが上限に達したら、道具を使わずに答えさせる。
  */
 export async function chatWithOpenRouter(
-	apiKey: string,
+	caller: SigwCaller,
 	request: ChatRequest,
 ): Promise<ChatResult> {
 	const messages: OpenRouterMessage[] = [
@@ -147,7 +149,7 @@ export async function chatWithOpenRouter(
 	 */
 	let withFiles: { message: OpenRouterToolMessage; text: string }[] = [];
 	const send = () =>
-		post(apiKey, {
+		post(caller, {
 			model: request.model,
 			max_tokens: request.maxTokens,
 			messages,
@@ -277,15 +279,14 @@ export async function chatWithOpenRouter(
 
 /** 1回分を送る。失敗は、種類に分けて例外にする */
 async function post(
-	apiKey: string,
+	caller: SigwCaller,
 	body: unknown,
 ): Promise<OpenRouterResponse> {
 	let response: Response;
 	try {
-		response = await fetch(`${OPENROUTER_API_BASE}/chat/completions`, {
+		response = await sigwOpenRouterFetch(caller, "/chat/completions", {
 			method: "POST",
 			headers: {
-				Authorization: `Bearer ${apiKey}`,
 				"Content-Type": "application/json",
 				...APP_HEADERS,
 			},
@@ -306,11 +307,16 @@ async function post(
 	// 生成が始まった後のエラーは、ステータス200のまま本文のerrorに入る
 	const error = data?.error ?? data?.choices?.[0]?.error;
 	if (!response.ok || error) {
-		const status = error?.code ?? response.status;
+		// sigwが断ったときのcodeは、数ではなく、エラーの種類の文字列になる
+		const status =
+			typeof error?.code === "number" ? error.code : response.status;
 		throw new LlmError(
 			kindFromStatus(status),
 			status,
 			`OpenRouter error ${status}`,
+			null,
+			// sigw自身が断ったときは(上限額に達した、など)、sigwの文を本人に見せる
+			sigwErrorMessage(error?.message),
 		);
 	}
 	if (!data?.choices?.[0]) {

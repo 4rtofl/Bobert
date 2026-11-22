@@ -15,6 +15,8 @@ const TEST_SECRETS = {
 	GITHUB_APP_CLIENT_ID: "Iv23test",
 	GITHUB_APP_CLIENT_SECRET: "test-github-client-secret",
 	GITHUB_APP_SLUG: "bobert-test",
+	SIGW_ANTHROPIC_KEY: "sgk-anthropic-test",
+	SIGW_OPENROUTER_KEY: "sgk-openrouter-test",
 };
 Object.assign(process.env, TEST_SECRETS);
 
@@ -27,6 +29,11 @@ export default defineConfig({
 			miniflare: {
 				// D1のスキーマは、test/setup.ts でテストの前に作る
 				bindings: { TEST_MIGRATIONS: await readD1Migrations("./migrations") },
+				// sigwのWorkerは、テストでは動かさない。test/setup.ts で、テストの中の偽物に差し替える
+				serviceBindings: {
+					SIGW: () =>
+						new Response("sigw is not available in tests", { status: 500 }),
+				},
 			},
 		})),
 	],

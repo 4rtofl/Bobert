@@ -16,13 +16,16 @@ import {
 	discordMessage,
 	discordReply,
 } from "./fixtures";
-import { anthropicStreamOf, type FetchCall, mockFetch } from "./helpers";
+import {
+	anthropicStreamOf,
+	type FetchCall,
+	mockFetch,
+	TEST_CALLER,
+} from "./helpers";
 
 afterEach(() => {
 	vi.restoreAllMocks();
 });
-
-const CREDENTIAL = { apiKey: "sk-ant-test", workspaceId: null };
 
 /** 呼ばれた回数を数える、偽物の道具 */
 function fakeTool(result = "返信先: Alice: こんにちは") {
@@ -104,7 +107,7 @@ describe("道具のやり取り(Anthropic)", () => {
 		);
 
 		const result = await chatWithAnthropic(
-			CREDENTIAL,
+			TEST_CALLER,
 			request("claude-haiku-5-5", [tool]),
 		);
 
@@ -164,7 +167,7 @@ describe("道具のやり取り(Anthropic)", () => {
 		);
 
 		const result = await chatWithAnthropic(
-			CREDENTIAL,
+			TEST_CALLER,
 			request("claude-haiku-5-5", [tool]),
 		);
 
@@ -185,7 +188,7 @@ describe("道具のやり取り(Anthropic)", () => {
 		);
 
 		await chatWithAnthropic(
-			CREDENTIAL,
+			TEST_CALLER,
 			request("claude-haiku-5-5", [fakeTool()]),
 		);
 
@@ -207,7 +210,7 @@ describe("道具のやり取り(Anthropic)", () => {
 			anthropicStreamOf([{ type: "text", text: "こんにちは" }]),
 		);
 
-		await chatWithAnthropic(CREDENTIAL, {
+		await chatWithAnthropic(TEST_CALLER, {
 			...request("claude-haiku-5-5", [fakeTool()]),
 			webSearch: true,
 		});
@@ -223,7 +226,7 @@ describe("道具のやり取り(Anthropic)", () => {
 		);
 
 		const result = await chatWithAnthropic(
-			CREDENTIAL,
+			TEST_CALLER,
 			request("claude-haiku-5-5", []),
 		);
 
@@ -243,7 +246,7 @@ describe("道具のやり取り(OpenRouter)", () => {
 		);
 
 		const result = await chatWithOpenRouter(
-			"sk-or-test",
+			TEST_CALLER,
 			request("openai/gpt-6-luna", [tool]),
 		);
 
@@ -297,7 +300,7 @@ describe("道具のやり取り(OpenRouter)", () => {
 		);
 
 		const result = await chatWithOpenRouter(
-			"sk-or-test",
+			TEST_CALLER,
 			request("openai/gpt-6-luna", [tool]),
 		);
 

@@ -1,4 +1,5 @@
 import { DiscordApiError, getGuildMember } from "../discord/api";
+import { sigwProviders } from "../llm/sigw";
 import type { LlmError, TokenUsage } from "../llm/types";
 import { logEvent } from "../log";
 import {
@@ -11,7 +12,6 @@ import {
 	usableDonations,
 } from "../store/donations";
 import {
-	type Credential,
 	getRegisteredProviders,
 	loadCredential,
 	type UserSettings,
@@ -23,8 +23,18 @@ import {
 	selectedCandidate,
 	usesCustomModel,
 } from "./model";
-import { DONATIONS_UNAVAILABLE, donationNote, setupGuidance } from "./replies";
+import {
+	DONATIONS_UNAVAILABLE,
+	donationNote,
+	modelUnavailableText,
+} from "./replies";
 import { chargeableCost } from "./usage";
+
+/**
+ * 寄付を使うか。いまは使わず、費用は頼んだ人がsigwで払う(仕様: docs/spec/llm-cost.md「AIの呼び出しと費用の負担」)。
+ * 寄付の仕組みは、別に外す
+ */
+const USE_DONATIONS = false;
 
 /** 寄付した人のキーが無効か残高不足のときに、その寄付を止めておく時間 */
 export const DONATION_PAUSE_MS = 60 * 60 * 1000;
@@ -39,11 +49,12 @@ export type Payer =
 	| { kind: "self" }
 	| { kind: "donation"; guildId: string; donorId: string };
 
-/** 返答に使うモデルと、費用を払う人のキー */
+/** 返答に使うモデルと、費用を払う人 */
 export interface PaidModel {
 	payer: Payer;
 	model: ResolvedModel;
-	credential: Credential;
+	/** 費用を払う人のDiscordのID。sigwに x-sigw-user で渡す */
+	billedUserId: string;
 }
 
 export type PaidModelResolution =
@@ -52,12 +63,14 @@ export type PaidModelResolution =
 			ok: false;
 			/** 何が足りないか(ログ用) */
 			missing: Extract<ModelResolution, { ok: false }>["missing"];
-			/** 本人に見せる、登録方法の案内 */
+			/** 本人に見せる、使えない理由 */
 			guidance: string;
 	  };
 
 /**
- * 返答に使うモデルと、費用を払う人を決める(仕様: docs/spec/llm-cost.md「クレジットの寄付」)。
+ * 返答に使うモデルと、費用を払う人を決める(仕様: docs/spec/llm-cost.md「AIの呼び出しと費用の負担」)。
+ * 費用は、頼んだ本人が払う。モデルは、Bobertにあるsigwのキーで呼べるものから決める。
+ * 以下は寄付を使うとき(USE_DONATIONS)の動き(仕様: docs/spec/llm-cost.md「クレジットの寄付」)。
  * サーバーに寄付があれば、古い順に、寄付した人のキーで本人の設定のモデルを呼べるか確かめて、先に使う。
  * 「その他」で入力したモデルには、寄付を使わない。使える寄付がなければ、本人のキーを使う。
  * checkMembershipなら、寄付した人がサーバーにいるか確かめ、抜けていたら寄付を終える。
@@ -75,7 +88,7 @@ export async function resolvePaidModel(
 	},
 ): Promise<PaidModelResolution> {
 	const { userId, guildId, settings } = request;
-	if (guildId !== null && !usesCustomModel(settings)) {
+	if (USE_DONATIONS && guildId !== null && !usesCustomModel(settings)) {
 		for (const donation of await usableDonations(env.DB, guildId, userId)) {
 			if (request.skipDonors?.has(donation.donorId)) {
 				continue;
@@ -101,16 +114,13 @@ export async function resolvePaidModel(
 					ok: true,
 					payer: { kind: "donation", guildId, donorId: donation.donorId },
 					model: resolution.model,
-					credential,
+					billedUserId: donation.donorId,
 				};
 			}
 		}
 	}
 
-	const resolution = resolveModel(
-		settings,
-		await getRegisteredProviders(env.DB, userId),
-	);
+	const resolution = resolveModel(settings, sigwProviders(env));
 	if (!resolution.ok) {
 		return {
 			ok: false,
@@ -118,30 +128,16 @@ export async function resolvePaidModel(
 			guidance: await guidance(env, guildId, resolution),
 		};
 	}
-	const credential = await loadCredential(
-		env,
-		userId,
-		resolution.model.provider,
-	);
-	if (credential === null) {
-		// 直前に /delete された
-		const missing = { ok: false, missing: "credentials", label: "" } as const;
-		return {
-			ok: false,
-			missing: missing.missing,
-			guidance: await guidance(env, guildId, missing),
-		};
-	}
 	return {
 		ok: true,
 		payer: { kind: "self" },
 		model: resolution.model,
-		credential,
+		billedUserId: userId,
 	};
 }
 
 /**
- * 登録方法の案内。キーのない人には、寄付されたことがあるサーバーなら、いまは寄付を使えないことを先に書く
+ * モデルを呼べない理由。どのキーもないときは、寄付されたことがあるサーバーなら、いまは寄付を使えないことを先に書く
  * (いま使える寄付があれば、ここには来ない)
  */
 async function guidance(
@@ -149,7 +145,7 @@ async function guidance(
 	guildId: string | null,
 	resolution: Extract<ModelResolution, { ok: false }>,
 ): Promise<string> {
-	const text = setupGuidance(resolution);
+	const text = modelUnavailableText(resolution);
 	return resolution.missing === "credentials" &&
 		guildId !== null &&
 		(await hasDonationHistory(env.DB, guildId))

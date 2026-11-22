@@ -5,6 +5,7 @@ import {
 	MAX_TOOL_CALLS,
 	MAX_WEB_SEARCHES,
 } from "../config/models";
+import { type SigwCaller, sigwAnthropicClient, sigwErrorMessage } from "./sigw";
 import {
 	countsTowardLimit,
 	FILES_REJECTED,
@@ -21,6 +22,7 @@ import {
 	describeError,
 	type KeyCheckResult,
 	LlmError,
+	type LlmErrorKind,
 	type ModelCheckResult,
 	type Source,
 	sumUsage,
@@ -42,7 +44,7 @@ function isClaudeEffort(value: string): value is Effort {
 	return (CLAUDE_EFFORTS as readonly string[]).includes(value);
 }
 
-/** ユーザーのAnthropicの資格情報 */
+/** ユーザーが登録したAnthropicの資格情報(エージェントと動画で使う。返答などはsigwを通す) */
 export interface AnthropicCredential {
 	apiKey: string;
 	/** キーがワークスペースに属さないとき(個人キーなど)に使うワークスペースのID */
@@ -66,16 +68,16 @@ const MAX_CONTINUATIONS = 3;
 const MAX_ROUNDS = MAX_TOOL_CALLS + 5 + MAX_SKILL_READS + MAX_FILE_READS;
 
 /**
- * ユーザーのAnthropicのAPIキーで、Claudeを直接呼ぶ。
+ * sigw経由で、Claudeを呼ぶ。費用は、callerの人にかかる。
  * 思考(thinking)は指定しない。現行のClaudeは、省略するとモデルが必要に応じて考える。
  * - Web検索はサーバー側で動く。処理が長いと返答が途中で止まる(pause_turn)ので、そのときは続きを頼む
  * - Bobertの道具をAIが呼んだら、実行して結果を返し、続きを頼む。呼び出しが上限に達したら、道具を使わずに答えさせる
  */
 export async function chatWithAnthropic(
-	credential: AnthropicCredential,
+	caller: SigwCaller,
 	request: ChatRequest,
 ): Promise<ChatResult> {
-	const client = createClient(credential);
+	const client = sigwAnthropicClient(caller);
 	const messages: Anthropic.MessageParam[] =
 		request.messages.map(toMessageParam);
 	// 道具の定義は、毎回同じ並びにする(キャッシュのため)。Bobertの道具、Web検索の順
@@ -370,14 +372,14 @@ export async function checkAnthropicKey(
 }
 
 /**
- * 「その他」で入力されたClaudeのモデルを、このキーで使えるか確かめる。
+ * 「その他」で入力されたClaudeのモデルを、sigw経由で使えるか確かめる。
  * 料金のかからない、モデルの情報のAPIを呼ぶ。選べる思考の深さも、モデルの情報から取り出す。
  */
 export async function checkAnthropicModel(
-	credential: AnthropicCredential,
+	caller: SigwCaller,
 	modelId: string,
 ): Promise<ModelCheckResult> {
-	const client = createClient(credential, 1);
+	const client = sigwAnthropicClient(caller, 1);
 	try {
 		const model = await client.models.retrieve(modelId);
 		// Web検索を使えるかの情報がなければ、使えることにする
@@ -424,7 +426,7 @@ function claudeEfforts(
 }
 
 /**
- * SDKのクライアントを作る。
+ * ユーザーが登録したキーで、SDKのクライアントを作る(エージェントと動画、キーの確認で使う)。
  * ワークスペースに属さないキーでは、使うワークスペースのIDをリクエストのたびにヘッダーで送る。
  */
 export function createClient(
@@ -478,29 +480,41 @@ export function toLlmError(error: unknown): LlmError {
 	}
 	const status = error.status ?? null;
 	const message = `Anthropic API error ${status} ${error.type ?? ""}`.trim();
+	// sigw自身が断ったときは(上限額に達した、など)、sigwの文を本人に見せる
+	const sigw = sigwErrorMessage(
+		(error.error as { error?: { message?: unknown } } | undefined)?.error
+			?.message,
+	);
+	return new LlmError(apiErrorKind(error), status, message, null, sigw);
+}
+
+/** APIのエラーの、失敗の種類 */
+function apiErrorKind(
+	error: InstanceType<typeof Anthropic.APIError>,
+): LlmErrorKind {
 	if (error instanceof Anthropic.AuthenticationError) {
-		return new LlmError("invalid_key", status, message);
+		return "invalid_key";
 	}
-	if (error.type === "billing_error" || status === 402) {
-		return new LlmError("insufficient_credit", status, message);
+	if (error.type === "billing_error" || error.status === 402) {
+		return "insufficient_credit";
 	}
 	if (error instanceof Anthropic.PermissionDeniedError) {
-		return new LlmError("forbidden", status, message);
+		return "forbidden";
 	}
 	if (error instanceof Anthropic.NotFoundError) {
-		return new LlmError("model_not_found", status, message);
+		return "model_not_found";
 	}
 	if (error instanceof Anthropic.RateLimitError) {
-		return new LlmError("rate_limited", status, message);
+		return "rate_limited";
 	}
 	if (error instanceof Anthropic.InternalServerError) {
-		return new LlmError("unavailable", status, message);
+		return "unavailable";
 	}
-	if (status === 413) {
-		return new LlmError("too_large", status, message);
+	if (error.status === 413) {
+		return "too_large";
 	}
 	if (error instanceof Anthropic.BadRequestError) {
-		return new LlmError("bad_request", status, message);
+		return "bad_request";
 	}
-	return new LlmError("unknown", status, message);
+	return "unknown";
 }

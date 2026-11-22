@@ -12,10 +12,13 @@ import { describeCandidate } from "../src/interactions/model";
 import { clearModelInfoCache } from "../src/llm/model-info";
 import { getUserSettings, updateUserSettings } from "../src/store/users";
 import {
+	anthropicOnlyEnv,
 	editedMessage,
 	guildInteraction,
 	mockFetch,
 	mockModelApis,
+	noSigwEnv,
+	openRouterOnlyEnv,
 	sendInteraction,
 	userFactory,
 } from "./helpers";
@@ -73,19 +76,20 @@ function submitModelId(user: APIUser, modelId: string) {
 }
 
 describe("/model", () => {
-	it("キーを登録していなければ、メニューの代わりに登録を案内する", async () => {
-		const body = await sendInteraction(modelCommand(await userWith()));
+	it("Bobertにsigwのキーがなければ、メニューの代わりに、AIを呼び出せないことを伝える", async () => {
+		const body = await sendInteraction(
+			modelCommand(await userWith()),
+			noSigwEnv(),
+		);
 
 		expect(body.type).toBe(InteractionResponseType.ChannelMessageWithSource);
 		expect(body.data.flags).toBe(MessageFlags.Ephemeral);
-		expect(body.data.content).toContain("`/setup`");
+		expect(body.data.content).toContain("Bobertの管理者");
 		expect(body.data.components).toEqual([]);
 	});
 
-	it("OpenRouterと連携していれば、候補の20個と「その他」を、今のモデルを選んだ状態で出す", async () => {
-		const body = await sendInteraction(
-			modelCommand(await userWith("openrouter")),
-		);
+	it("キーを登録していなくても、sigwに両方のキーがあれば、候補の20個と「その他」を、今のモデルを選んだ状態で出す", async () => {
+		const body = await sendInteraction(modelCommand(await userWith()));
 
 		expect(body.data.flags).toBe(MessageFlags.Ephemeral);
 		expect(body.data.content).toBe("使うモデルを選んでください。");
@@ -112,9 +116,10 @@ describe("/model", () => {
 		).toHaveLength(1);
 	});
 
-	it("Anthropicのキーだけなら、Claudeの4つと「その他」だけを出す", async () => {
+	it("sigwのキーがAnthropicの分だけなら、Claudeの4つと「その他」だけを出す", async () => {
 		const body = await sendInteraction(
-			modelCommand(await userWith("anthropic")),
+			modelCommand(await userWith()),
+			anthropicOnlyEnv(),
 		);
 
 		const menu = body.data.components[0].components[0];
@@ -178,13 +183,15 @@ describe("/model", () => {
 		);
 	});
 
-	it("登録した資格情報で使えないモデルなら保存せず、必要な登録を案内する", async () => {
+	it("sigwのキーで呼べないモデルなら保存せず、いまは使えないことを伝える", async () => {
 		const user = await userWith("anthropic");
 		const calls = mockModelApis([]);
 
-		await sendInteraction(select(user, "gpt-6-luna"));
+		await sendInteraction(select(user, "gpt-6-luna"), anthropicOnlyEnv());
 
-		expect(editedMessage(calls)?.content).toContain("OpenRouterとの連携が必要");
+		expect(editedMessage(calls)?.content).toBe(
+			"モデル「GPT-6 Luna」が見つからないか、いまは使えません。",
+		);
 		expect((await getUserSettings(env.DB, user.id)).modelKey).toBeNull();
 	});
 
@@ -338,7 +345,7 @@ describe("/model の「その他」", () => {
 		);
 	});
 
-	it("claude-で始まるIDは、本人のキーでAnthropicに確かめる", async () => {
+	it("claude-で始まるIDは、sigw経由でAnthropicに確かめる", async () => {
 		const user = await userWith("anthropic");
 		const calls = mockModelApis([], () =>
 			Response.json({
@@ -356,7 +363,8 @@ describe("/model の「その他」", () => {
 		);
 		expect(check?.method).toBe("GET");
 		expect(check?.url.pathname).toBe("/v1/models/claude-sonnet-4-6");
-		expect(check?.headers.get("authorization")).toBe("Bearer key-anthropic");
+		expect(check?.headers.get("x-api-key")).toBe("sgk-anthropic-test");
+		expect(check?.headers.get("x-sigw-user")).toBe(user.id);
 		expect(calls.some((call) => call.url.hostname === "openrouter.ai")).toBe(
 			false,
 		);
@@ -386,17 +394,20 @@ describe("/model の「その他」", () => {
 		expect(editedMessage(calls)?.content).toContain("見つかりませんでした");
 	});
 
-	it("claude-で始まるIDでも、Anthropicのキーがなければ確かめずに登録を案内する", async () => {
+	it("claude-で始まるIDでも、sigwにAnthropicのキーがなければ、確かめずに、いまは使えないことを伝える", async () => {
 		const user = await userWith("openrouter");
 		const calls = mockModelApis([]);
 
-		await sendInteraction(submitModelId(user, "claude-sonnet-4-6"));
+		await sendInteraction(
+			submitModelId(user, "claude-sonnet-4-6"),
+			openRouterOnlyEnv(),
+		);
 
 		expect(
 			calls.some((call) => call.url.hostname === "api.anthropic.com"),
 		).toBe(false);
-		expect(editedMessage(calls)?.content).toContain(
-			"AnthropicのAPIキーの登録が必要",
+		expect(editedMessage(calls)?.content).toBe(
+			"モデル「claude-sonnet-4-6」が見つからないか、いまは使えません。",
 		);
 	});
 

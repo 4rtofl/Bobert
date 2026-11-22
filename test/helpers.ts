@@ -11,6 +11,7 @@ import type {
 	PermissionOverwrite,
 } from "../src/discord/channels";
 import { handleInteraction } from "../src/interactions/handler";
+import type { SigwCaller } from "../src/llm/sigw";
 import type { IngestDeps } from "../src/queue/ingest";
 import type { KnowledgeJob } from "../src/queue/messages";
 import {
@@ -119,6 +120,24 @@ export function userFactory(firstId: number) {
 		}
 		return user;
 	};
+}
+
+/** sigw経由でAIを呼ぶ人(AIの呼び出しを直接試すテスト用) */
+export const TEST_CALLER: SigwCaller = { env, userId: ALICE.id };
+
+/** sigwのキーが、OpenRouterの分しかない環境(Claudeの候補も、OpenRouter経由で呼ぶ) */
+export function openRouterOnlyEnv(base: Env = env): Env {
+	return { ...base, SIGW_ANTHROPIC_KEY: "" };
+}
+
+/** sigwのキーが、Anthropicの分しかない環境(Claude以外は使えない) */
+export function anthropicOnlyEnv(base: Env = env): Env {
+	return { ...base, SIGW_OPENROUTER_KEY: "" };
+}
+
+/** sigwのキーが、どちらもない環境(AIを呼び出せない) */
+export function noSigwEnv(base: Env = env): Env {
+	return { ...base, SIGW_ANTHROPIC_KEY: "", SIGW_OPENROUTER_KEY: "" };
 }
 
 /** OpenRouterのモデル一覧に載せるモデル */

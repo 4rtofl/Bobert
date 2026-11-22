@@ -1,5 +1,6 @@
 import type { APIInteractionResponse } from "discord-api-types/v10";
 import { DEFAULT_EFFORT } from "../config/models";
+import { sigwProviders } from "../llm/sigw";
 import { memorySettingLine } from "../memory/texts";
 import { availableEfforts, effectiveEffort } from "../respond/effort";
 import {
@@ -57,7 +58,8 @@ async function settingsMessage(
 		getUserSettings(env.DB, userId),
 		guildId === undefined ? null : loadMemory(env.DB, userId, guildId),
 	]);
-	const resolution = resolveModel(settings, providers);
+	// モデルは、Bobertにあるsigwのキーで呼ぶ。登録したキーの行は、登録の仕組みを外すまで残す
+	const resolution = resolveModel(settings, sigwProviders(env));
 	const lines = [
 		`- Anthropic: ${providers.has("anthropic") ? "登録済み" : "未登録"}`,
 		`- OpenRouter: ${providers.has("openrouter") ? "連携済み" : "未連携"}`,
@@ -92,7 +94,8 @@ function modelLine(
 	}
 	const label =
 		selectedCandidate(settings)?.label ?? settings.customModelId ?? "";
-	return `${label}(\`/setup\`で登録が必要)`;
+	// Bobertに、そのプロバイダのsigwのキーがない
+	return `${label}(いまは使えません)`;
 }
 
 /** 実際に使う思考の深さ。既定の段階(lowを選べなければ、代わりに使う段階)には「(既定)」を付ける */
