@@ -1,15 +1,20 @@
 import { DurableObject } from "cloudflare:workers";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { ConversationFile } from "dopagakix/conversation";
-import { agentClient, deleteSession, isSessionGone } from "../agent/managed";
+import {
+	agentClient,
+	agentsAvailable,
+	deleteSession,
+	isSessionGone,
+} from "../agent/managed";
 import { discordUploadLimit, MAX_ATTACHMENT_BYTES } from "../agent/relay";
 import { formatMegabytes } from "../agent/texts";
 import { createMessage, getGuild } from "../discord/api";
-import { type AnthropicCredential, toLlmError } from "../llm/anthropic";
+import { toLlmError } from "../llm/anthropic";
+import { AI_UNAVAILABLE_TEXT } from "../llm/sigw";
 import { LlmError } from "../llm/types";
 import { logEvent } from "../log";
 import { describeLlmError } from "../respond/replies";
-import { loadCredential } from "../store/users";
 import {
 	checkVideoSession,
 	deleteVideoOutputs,
@@ -62,7 +67,7 @@ type Ending =
 
 /**
  * 動画の仕事のDurable Object(利用者ごとに1つ。仕様: docs/spec/architecture.md「動画の作成」)。
- * 本人のAnthropicのアカウントでサンドボックスのセッションを始め、アラームで様子を見回る。
+ * sigw経由で(費用は頼んだ人にかかる)サンドボックスのセッションを始め、アラームで様子を見回る。
  * 動画ができたら、頼んだメッセージへの返信として投稿し、セッションとファイルを消す。
  * デプロイなどで止まっても、保存したセッションのIDで、次のアラームから続ける
  */
@@ -86,15 +91,15 @@ export class VideoJob extends DurableObject<Env> {
 		});
 	}
 
-	/** /delete。セッションを消し、記録を消す。知らせは出さない。本人のキーはD1から先に消すので、呼び出し元から受け取る */
-	async purge(credential: AnthropicCredential | null): Promise<void> {
+	/** /delete。セッションを消し、記録を消す。知らせは出さない */
+	async purge(): Promise<void> {
 		await this.serial(async () => {
 			const state = await this.loadState();
 			if (state === null) {
 				return;
 			}
-			if (credential !== null) {
-				await this.cleanUp(agentClient(credential), state);
+			if (agentsAvailable(this.env)) {
+				await this.cleanUp(agentClient(this.env, state.userId), state);
 			}
 			await this.clear(state);
 		});
@@ -106,18 +111,19 @@ export class VideoJob extends DurableObject<Env> {
 			if (state === null) {
 				return;
 			}
-			const credential = await loadCredential(
-				this.env,
-				state.userId,
-				"anthropic",
-			);
-			if (credential === null) {
-				// キーが消された(/delete)。セッションは /delete が消すので、記録だけを消す。知らせは出さない
-				this.log("credential_missing", state);
+			if (!agentsAvailable(this.env)) {
+				// Bobertからsigwのキーが外された。セッションを操作できないので、知らせて、記録だけを消す
+				this.log("sigw_key_missing", state);
+				await this.notify(state, AI_UNAVAILABLE_TEXT).catch(
+					(error: unknown) => {
+						this.log("notify_failed", state, error);
+					},
+				);
 				await this.clear(state);
 				return;
 			}
-			const client = agentClient(credential);
+			// 費用は、動画を頼んだ人にかかる
+			const client = agentClient(this.env, state.userId);
 			if (Date.now() >= state.requestedAt + VIDEO_TIMEOUT_MS) {
 				this.log("timed_out", state);
 				await this.finish(client, state, { kind: "timeout" });

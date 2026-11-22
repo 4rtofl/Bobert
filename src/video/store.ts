@@ -2,7 +2,7 @@ import type { AgentResources } from "../agent/store";
 
 /**
  * 動画の作成の記録(D1)。仕様: docs/spec/architecture.md「動画の作成」
- * - video_users: 利用者ごとに、本人のAnthropicのアカウントに作った、動画用のエージェントの設定と環境
+ * - video_users: 利用者ごとに、Bobert専用のワークスペースに本人ごとに作った、動画用のエージェントの設定と環境
  * - video_jobs: 作っている途中の動画(1人1本まで)
  */
 

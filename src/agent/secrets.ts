@@ -4,7 +4,7 @@ import { getAgentVault, saveAgentVault } from "./store";
 
 /**
  * エージェントに渡す秘密(#99。仕様: docs/spec/architecture.md「エージェント(Bobert Agent)」)。
- * 本人のAnthropicのアカウントにvaultを1つ作り、秘密を環境変数(environment_variable)として預ける。
+ * Bobert専用のワークスペースに、本人ごとにvaultを1つ作り、秘密を環境変数(environment_variable)として預ける。
  * サンドボックスの中ではダミーの文字列になり、送り先のホストへのリクエストのヘッダーの中でだけ、Anthropic側で本物に差し替わる。
  * 値はBobertに残さない。名前と送り先も、そのつどvaultから読む
  */
@@ -64,7 +64,7 @@ export async function listAgentSecrets(
 	try {
 		return await secretsIn(client, vaultId);
 	} catch (error) {
-		// 別のワークスペースのキーに替えたときなど。秘密は、そのワークスペースには無い
+		// sigw経由に替える前に、本人のアカウントに作ったvaultなど。秘密は、Bobertのワークスペースには無い
 		if (error instanceof Anthropic.NotFoundError) {
 			return [];
 		}
@@ -101,7 +101,7 @@ export async function vaultForSession(
 export type AddSecretResult = "added" | "duplicate" | "limit";
 
 /**
- * 秘密を預ける。vaultがなければ作る。記録したvaultが見つからなければ(別のワークスペースのキーに替えたときなど)、作り直す。
+ * 秘密を預ける。vaultがなければ作る。記録したvaultが見つからなければ(sigw経由に替える前に、本人のアカウントに作ったものなど)、作り直す。
  * 値はヘッダーの中だけで、送り先のホストへのリクエストにだけ差し替わるようにする
  */
 export async function addAgentSecret(
@@ -149,7 +149,7 @@ export async function addAgentSecret(
 	}
 }
 
-/** 秘密を消す。もう無ければ(ほかの画面で消した、ワークスペースを替えた)、消せたことにする */
+/** 秘密を消す。もう無ければ(ほかの画面で消した、sigw経由に替える前のvaultだった)、消せたことにする */
 export async function deleteAgentSecret(
 	db: D1Database,
 	userId: string,

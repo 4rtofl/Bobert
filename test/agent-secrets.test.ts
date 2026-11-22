@@ -21,6 +21,7 @@ import {
 	type FetchCall,
 	guildInteraction,
 	mockFetch,
+	openRouterOnlyEnv,
 	sendInteraction,
 	userFactory,
 } from "./helpers";
@@ -33,9 +34,9 @@ afterEach(() => {
 });
 
 const NOTE =
-	"-# 値はAnthropicに預け、Bobertにもエージェントのサンドボックスにも残しません。同じAnthropicのワークスペースの開発者は、この秘密を自分のセッションで使えます(値は見られません)。";
-const KEY_MISSING =
-	"秘密を登録するには、AnthropicのAPIキーの登録が必要です(OpenRouterでは使えません)。`/setup` から登録してください。";
+	"-# 値はAnthropicに預け、Bobertにもエージェントのサンドボックスにも残しません。Bobertの管理者は、この秘密を自分のセッションで使えます(値は見られません)。";
+const AI_UNAVAILABLE =
+	"いまはAIを呼び出せません。Bobertの管理者に知らせてください。";
 
 interface FakeCredential {
 	id: string;
@@ -182,13 +183,13 @@ describe("/agentsecrets", () => {
 		);
 	});
 
-	it("Anthropicのキーがなければ、登録を案内する(OpenRouterだけの人も)", async () => {
-		const user = await newUser("openrouter");
+	it("BobertにAnthropicのsigwのキーがなければ、AIを呼び出せないと知らせる", async () => {
+		const user = await newUser("anthropic");
 		const { calls } = mockVaultApis();
 
-		expect(await sendInteraction(command(user))).toEqual({
+		expect(await sendInteraction(command(user), openRouterOnlyEnv())).toEqual({
 			type: InteractionResponseType.ChannelMessageWithSource,
-			data: { flags: MessageFlags.Ephemeral, content: KEY_MISSING },
+			data: { flags: MessageFlags.Ephemeral, content: AI_UNAVAILABLE },
 		});
 		expect(calls).toHaveLength(0);
 	});
@@ -578,12 +579,12 @@ describe("セッションと /delete", () => {
 			),
 		);
 
-		expect(
-			calls.some(
-				(call) =>
-					call.method === "DELETE" && call.url.pathname === "/v1/vaults/vlt_1",
-			),
-		).toBe(true);
+		// 本人のキーではなく、sigw経由で、本人のIDを付けて消す
+		const deleted = calls.find(
+			(call) =>
+				call.method === "DELETE" && call.url.pathname === "/v1/vaults/vlt_1",
+		);
+		expect(deleted?.headers.get("x-sigw-user")).toBe(user.id);
 		expect(await getAgentVault(env.DB, user.id)).toBe(null);
 	});
 });

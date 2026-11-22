@@ -9,7 +9,12 @@ import {
 	MessageFlags,
 } from "../src/discord/constants";
 import { getUserSettings } from "../src/store/users";
-import { guildInteraction, sendInteraction, userFactory } from "./helpers";
+import {
+	guildInteraction,
+	openRouterOnlyEnv,
+	sendInteraction,
+	userFactory,
+} from "./helpers";
 
 /** 新しいユーザー(テストごとに別の人にする) */
 const userWith = userFactory(700);
@@ -88,14 +93,17 @@ describe("/feat", () => {
 		expect(settings.featWebSearch).toBe(true);
 	});
 
-	it("動画の作成は、Anthropicのキーがなければ、ONにせずに登録を案内する", async () => {
-		const user = await userWith("openrouter");
+	it("動画の作成は、BobertにAnthropicのsigwのキーがなければ、ONにせずに知らせる", async () => {
+		const user = await userWith("anthropic");
 
-		const body = await sendInteraction(press(user, "feat:video"));
+		const body = await sendInteraction(
+			press(user, "feat:video"),
+			openRouterOnlyEnv(),
+		);
 
 		expect(body.type).toBe(InteractionResponseType.UpdateMessage);
 		expect(body.data.content).toBe(
-			"動画の作成を使うには、AnthropicのAPIキーの登録が必要です(OpenRouterでは使えません)。`/setup` から登録してください。",
+			"いまはAIを呼び出せません。Bobertの管理者に知らせてください。",
 		);
 		expect(body.data.components[0].components[2]).toMatchObject({
 			label: "動画の作成: OFF",
@@ -103,8 +111,8 @@ describe("/feat", () => {
 		expect((await getUserSettings(env.DB, user.id)).featVideo).toBe(false);
 	});
 
-	it("Anthropicのキーがあれば、動画の作成をONにできる", async () => {
-		const user = await userWith("anthropic");
+	it("本人のキーがなくても、動画の作成をONにできる", async () => {
+		const user = await userWith();
 
 		const on = await sendInteraction(press(user, "feat:video"));
 

@@ -113,7 +113,8 @@ function posted(calls: FetchCall[], channelId: string) {
 
 describe("エージェントのチャンネルのDurable Object", () => {
 	it("本人の発言をセッションに送り、作業の様子とエージェントの返事をチャンネルに書き込む", async () => {
-		const owner = await newUser("anthropic");
+		// 本人のキーは要らない。sigw経由で、チャンネルの持ち主の費用として呼ぶ
+		const owner = await newUser();
 		const channelId = "62101";
 		const stub = await startedChannel(channelId, owner.id);
 		const calls = mockApis([
@@ -169,6 +170,15 @@ describe("エージェントのチャンネルのDurable Object", () => {
 				},
 			],
 		});
+		// イベントの送信も流れも、Bobert用のsigwのキーで、持ち主のIDを付けて呼ぶ
+		const managed = calls.filter(
+			(call) => call.url.hostname === "api.anthropic.com",
+		);
+		expect(managed.length).toBeGreaterThan(1);
+		for (const call of managed) {
+			expect(call.headers.get("x-api-key")).toBe("sgk-anthropic-test");
+			expect(call.headers.get("x-sigw-user")).toBe(owner.id);
+		}
 		// 動き始めたら、「止める」ボタンだけの知らせを出す
 		expect(posted(calls, channelId)[0]).toMatchObject({
 			components: [
@@ -177,7 +187,7 @@ describe("エージェントのチャンネルのDurable Object", () => {
 		});
 	});
 
-	it("添付ファイルを、本人のアカウントに上げてサンドボックスに置き、置き場所を書いて送る", async () => {
+	it("添付ファイルを、Bobertのワークスペースに上げてサンドボックスに置き、置き場所を書いて送る", async () => {
 		const owner = await newUser("anthropic");
 		const channelId = "62103";
 		const stub = await startedChannel(channelId, owner.id);

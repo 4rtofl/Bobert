@@ -789,12 +789,8 @@ describe("メンションと返信への応答", () => {
 		);
 	});
 
-	it("動画の作成をONにし、Anthropicのキーがあれば、動画の道具を渡す", async () => {
+	it("動画の作成をONにすれば、本人のキーがなくても、動画の道具を渡す", async () => {
 		const user = { ...ALICE, id: "191" };
-		await saveCredential(env, user.id, "anthropic", {
-			apiKey: "sk-ant-test",
-			workspaceId: null,
-		});
 		await updateUserSettings(env.DB, user.id, { featVideo: true });
 		const trigger = discordMessage(
 			"5920",
@@ -817,12 +813,8 @@ describe("メンションと返信への応答", () => {
 		expect(tools).toContain("create_video");
 	});
 
-	it("動画の作成をONにしていても、Anthropicのキーがなければ、動画の道具を渡さない", async () => {
+	it("動画の作成をONにしていても、BobertにAnthropicのsigwのキーがなければ、動画の道具を渡さない", async () => {
 		const user = { ...ALICE, id: "192" };
-		await saveCredential(env, user.id, "openrouter", {
-			apiKey: "sk-or-test",
-			workspaceId: null,
-		});
 		await updateUserSettings(env.DB, user.id, { featVideo: true });
 		const trigger = discordMessage(
 			"5921",

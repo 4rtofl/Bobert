@@ -9,7 +9,7 @@ export const ENDAGENT_COMMAND_NAME = "endagent";
 
 /** /agent の説明 */
 export const AGENT_COMMAND_DESCRIPTION =
-	"Claudeのエージェントに作業を頼む、自分専用のチャンネルの作成(Anthropicのキーが必要)";
+	"Claudeのエージェントに作業を頼む、自分専用のチャンネルの作成";
 
 /** /endagent の説明 */
 export const ENDAGENT_COMMAND_DESCRIPTION =
@@ -32,10 +32,6 @@ export function agentChannelName(username: string, number: number): string {
 export function createdMessage(channelId: string): string {
 	return `<#${channelId}> を作りました。そのチャンネルで、エージェントに作業を頼めます。`;
 }
-
-/** Anthropicのキーがない(OpenRouterだけの人も) */
-export const KEY_MISSING =
-	"エージェントを使うには、AnthropicのAPIキーの登録が必要です(OpenRouterでは使えません)。`/setup` から登録してください。";
 
 /** 終えていないセッションが上限まである */
 export function tooManySessions(channelIds: readonly string[]): string {
@@ -173,7 +169,7 @@ export function sessionFailed(reason: string): string {
 	return `セッションがエラーで終わりました。${reason}`;
 }
 
-/** キーを替えて(別のワークスペースのキーにして)、セッションを操作できない */
+/** セッションを操作できない(sigw経由に替える前に、本人のアカウントで始めたセッションなど) */
 export const KEY_CANNOT_OPERATE =
 	"このキーでは、このセッションを操作できません。";
 

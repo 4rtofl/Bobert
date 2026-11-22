@@ -1,5 +1,9 @@
 import type { APIInteractionResponse } from "discord-api-types/v10";
-import { agentClient, retireAgentResources } from "../agent/managed";
+import {
+	agentClient,
+	agentsAvailable,
+	retireAgentResources,
+} from "../agent/managed";
 import { deleteAgentVault } from "../agent/secrets";
 import {
 	type AgentChannel,
@@ -18,13 +22,12 @@ import {
 	MessageFlags,
 } from "../discord/constants";
 import { revokeGitHubAuthorization } from "../github/account";
-import type { AnthropicCredential } from "../llm/anthropic";
 import { logEvent } from "../log";
 import { DELETE_MEMORY_NOTE } from "../memory/texts";
 import { isDonating } from "../store/donations";
 import { hasGitHubLink, loadGitHubLink } from "../store/github";
 import { deleteUserMemory, hasAnyMemory } from "../store/memory";
-import { deleteUserData, loadCredential } from "../store/users";
+import { deleteUserData } from "../store/users";
 import {
 	deleteVideoRecordsOf,
 	getVideoJob,
@@ -82,7 +85,7 @@ export async function deleteCommand(
 
 /**
  * 確認のボタン: キーと設定と記憶を消す(仕様: docs/spec/llm-cost.md「資格情報の登録・保存・削除」)。
- * エージェントのセッションは、本人のキーでないと消せないので、キーを読んでおき、記録を消してから、裏でセッションとチャンネルを消す。
+ * エージェントと動画のセッションは、記録を消してから、裏でsigw経由で消す(sigwが、消す直前までの費用を本人に付ける)。
  * GitHubとの連携も同じく、トークンを読んでおき、記録を消してから、裏でGitHubの側の承認を取り消す
  */
 export async function confirmDelete(
@@ -98,10 +101,6 @@ export async function confirmDelete(
 	const videoJob = await getVideoJob(env.DB, userId);
 	const videoResources = await getVideoResources(env.DB, userId);
 	const hasVideo = videoJob !== null || videoResources !== null;
-	const credential =
-		hasAgents || hasVideo
-			? await loadCredential(env, userId, "anthropic")
-			: null;
 	const github = await loadGitHubLink(env, userId);
 	await deleteAgentRecordsOf(env.DB, userId);
 	await deleteVideoRecordsOf(env.DB, userId);
@@ -109,14 +108,10 @@ export async function confirmDelete(
 	await deleteUserMemory(env.DB, userId);
 	logEvent("interactions", "user_data_deleted", { userId });
 	if (hasAgents) {
-		ctx.waitUntil(
-			removeAgents(env, userId, channels, resources, vaultId, credential),
-		);
+		ctx.waitUntil(removeAgents(env, userId, channels, resources, vaultId));
 	}
 	if (hasVideo) {
-		ctx.waitUntil(
-			removeVideo(env, userId, videoJob !== null, videoResources, credential),
-		);
+		ctx.waitUntil(removeVideo(env, userId, videoJob !== null, videoResources));
 	}
 	if (github !== null) {
 		ctx.waitUntil(revokeGitHubAuthorization(env, userId, github));
@@ -132,7 +127,7 @@ export async function confirmDelete(
 }
 
 /**
- * 本人のエージェントのセッションとチャンネルを消し、本人のアカウントに作った環境と、秘密を預けたvaultを消して、エージェントの設定をアーカイブする。
+ * 本人のエージェントのセッションとチャンネルを消し、本人のために作った環境と、秘密を預けたvaultを消して、エージェントの設定をアーカイブする。
  * 失敗しても、キーと設定はもう消してあるので、記録を残すだけにする
  */
 async function removeAgents(
@@ -141,11 +136,12 @@ async function removeAgents(
 	channels: readonly AgentChannel[],
 	resources: AgentResources | null,
 	vaultId: string | null,
-	credential: AnthropicCredential | null,
 ): Promise<void> {
+	// Bobertにsigwのキーがなければ、Bobertのワークスペースのものは消せない
+	const client = agentsAvailable(env) ? agentClient(env, userId) : null;
 	for (const channel of channels) {
 		try {
-			await agentSessionStub(env, channel.channelId).purge(credential);
+			await agentSessionStub(env, channel.channelId).purge();
 			await gatewayStub(env).removeAgentChannel(channel.channelId);
 		} catch (error) {
 			logEvent("agent", "delete_cleanup_failed", {
@@ -155,30 +151,26 @@ async function removeAgents(
 		}
 	}
 	// エージェントに渡す秘密は、vaultごと消す
-	if (vaultId !== null && credential !== null) {
-		await deleteAgentVault(agentClient(credential), vaultId).catch(
-			(error: unknown) => {
-				logEvent("agent", "vault_cleanup_failed", {
-					userId,
-					error: error instanceof Error ? error.message : String(error),
-				});
-			},
-		);
+	if (vaultId !== null && client !== null) {
+		await deleteAgentVault(client, vaultId).catch((error: unknown) => {
+			logEvent("agent", "vault_cleanup_failed", {
+				userId,
+				error: error instanceof Error ? error.message : String(error),
+			});
+		});
 	}
-	if (resources !== null && credential !== null) {
-		await retireAgentResources(agentClient(credential), resources).catch(
-			(error: unknown) => {
-				logEvent("agent", "resources_cleanup_failed", {
-					userId,
-					error: error instanceof Error ? error.message : String(error),
-				});
-			},
-		);
+	if (resources !== null && client !== null) {
+		await retireAgentResources(client, resources).catch((error: unknown) => {
+			logEvent("agent", "resources_cleanup_failed", {
+				userId,
+				error: error instanceof Error ? error.message : String(error),
+			});
+		});
 	}
 }
 
 /**
- * 作っている途中の動画のセッションを消し、本人のアカウントに作った動画用の環境を消して、エージェントの設定をアーカイブする。
+ * 作っている途中の動画のセッションを消し、本人のために作った動画用の環境を消して、エージェントの設定をアーカイブする。
  * 失敗しても、キーと設定はもう消してあるので、記録を残すだけにする
  */
 async function removeVideo(
@@ -186,11 +178,10 @@ async function removeVideo(
 	userId: string,
 	hasJob: boolean,
 	resources: AgentResources | null,
-	credential: AnthropicCredential | null,
 ): Promise<void> {
 	if (hasJob) {
 		await videoJobStub(env, userId)
-			.purge(credential)
+			.purge()
 			.catch((error: unknown) => {
 				logEvent("video", "delete_cleanup_failed", {
 					userId,
@@ -198,8 +189,8 @@ async function removeVideo(
 				});
 			});
 	}
-	if (resources !== null && credential !== null) {
-		await retireAgentResources(agentClient(credential), resources).catch(
+	if (resources !== null && agentsAvailable(env)) {
+		await retireAgentResources(agentClient(env, userId), resources).catch(
 			(error: unknown) => {
 				logEvent("video", "resources_cleanup_failed", {
 					userId,

@@ -9,14 +9,14 @@ import {
 	InteractionResponseType,
 	MessageFlags,
 } from "../discord/constants";
+import { AI_UNAVAILABLE_TEXT, sigwProviders } from "../llm/sigw";
 import { logEvent } from "../log";
 import {
-	getRegisteredProviders,
 	getUserSettings,
 	type UserSettings,
 	updateUserSettings,
 } from "../store/users";
-import { VIDEO_FEATURE_LABEL, VIDEO_KEY_MISSING } from "../video/texts";
+import { VIDEO_FEATURE_LABEL } from "../video/texts";
 
 /** /feat のボタンのIDの頭 */
 export const FEAT_BUTTON_PREFIX = "feat:";
@@ -37,15 +37,15 @@ const FEATURES = [
 		setting: "featVideo",
 		customId: `${FEAT_BUTTON_PREFIX}video`,
 		label: VIDEO_FEATURE_LABEL,
-		// 動画は本人のAnthropicのアカウントで作るので、キーがなければONにできない
-		needsAnthropicKey: VIDEO_KEY_MISSING,
+		// 動画はManaged Agentsで作るので、BobertにAnthropicのsigwのキーがなければONにできない
+		needsAgents: true,
 	},
 ] as const satisfies readonly {
 	setting: keyof UserSettings;
 	customId: string;
 	label: string;
-	/** ONにするのにAnthropicのキーが要る機能なら、キーがない人に見せる案内 */
-	needsAnthropicKey?: string;
+	/** ONにするのに、BobertにAnthropicのsigwのキーが要る機能か */
+	needsAgents?: true;
 }[];
 
 /** /feat: 機能ごとのON/OFFのボタンを、本人にだけ見せる */
@@ -74,16 +74,16 @@ export async function toggleFeature(
 	const enabled = !settings[feature.setting];
 	if (
 		enabled &&
-		"needsAnthropicKey" in feature &&
-		!(await getRegisteredProviders(env.DB, userId)).has("anthropic")
+		"needsAgents" in feature &&
+		!sigwProviders(env).has("anthropic")
 	) {
-		logEvent("interactions", "feature_key_missing", {
+		logEvent("interactions", "feature_unavailable", {
 			userId,
 			feature: feature.setting,
 		});
 		return {
 			type: InteractionResponseType.UpdateMessage,
-			data: featMessage(settings, feature.needsAnthropicKey),
+			data: featMessage(settings, AI_UNAVAILABLE_TEXT),
 		};
 	}
 	await updateUserSettings(env.DB, userId, { [feature.setting]: enabled });

@@ -6,7 +6,12 @@ import type {
 	APIMessageComponentInteraction,
 	APIModalSubmitInteraction,
 } from "discord-api-types/v10";
-import { agentClient, agentModel, describeAgentError } from "../agent/managed";
+import {
+	agentClient,
+	agentModel,
+	agentsAvailable,
+	describeAgentError,
+} from "../agent/managed";
 import {
 	type AddSecretResult,
 	type AgentSecret,
@@ -25,13 +30,14 @@ import {
 	MessageFlags,
 	TextInputStyle,
 } from "../discord/constants";
-import { getUserSettings, loadCredential } from "../store/users";
+import { AI_UNAVAILABLE_TEXT } from "../llm/sigw";
+import { getUserSettings } from "../store/users";
 import { type MessageEdit, respondLater } from "./deferred";
 import { readTextInput } from "./input";
 
 /**
  * /agentsecrets: エージェントに渡す秘密(ログインの情報やAPIキー)の登録と一覧(#99。仕様: docs/spec/behavior.md「エージェント」)。
- * 値は本人のAnthropicのアカウントのvaultに預け、Bobertには残さない。画面はすべて本人にだけ見せる
+ * 値は、Bobert専用のワークスペースにある本人のvaultに(sigw経由で)預け、Bobertには残さない。画面はすべて本人にだけ見せる
  */
 
 export const AGENT_SECRETS_COMMAND_NAME = "agentsecrets";
@@ -53,9 +59,7 @@ const URL_INPUT_ID = "url";
 
 const PANEL_HEADER = "**エージェントに渡す秘密**";
 const PANEL_NOTE =
-	"-# 値はAnthropicに預け、Bobertにもエージェントのサンドボックスにも残しません。同じAnthropicのワークスペースの開発者は、この秘密を自分のセッションで使えます(値は見られません)。";
-const KEY_MISSING =
-	"秘密を登録するには、AnthropicのAPIキーの登録が必要です(OpenRouterでは使えません)。`/setup` から登録してください。";
+	"-# 値はAnthropicに預け、Bobertにもエージェントのサンドボックスにも残しません。Bobertの管理者は、この秘密を自分のセッションで使えます(値は見られません)。";
 const INVALID_NAME =
 	"名前は、英大文字、数字、_ だけで、先頭は英大文字にしてください。例: `WEATHER_API_KEY`";
 const INVALID_URL = "送り先は、https:// で始まるURLにしてください。";
@@ -68,9 +72,8 @@ export async function agentSecretsCommand(
 	ctx: ExecutionContext,
 	userId: string,
 ): Promise<APIInteractionResponse> {
-	const credential = await loadCredential(env, userId, "anthropic");
-	if (credential === null) {
-		return ephemeral(KEY_MISSING);
+	if (!agentsAvailable(env)) {
+		return ephemeral(AI_UNAVAILABLE_TEXT);
 	}
 	return respondLater(
 		ctx,
@@ -82,7 +85,7 @@ export async function agentSecretsCommand(
 				const secrets = await listAgentSecrets(
 					env.DB,
 					userId,
-					agentClient(credential),
+					agentClient(env, userId),
 				);
 				return panel(secrets);
 			} catch (error) {
@@ -134,9 +137,8 @@ export async function agentSecretsComponent(
 		}
 		case Action.Delete: {
 			const [id = "", name = ""] = values;
-			const credential = await loadCredential(env, userId, "anthropic");
-			if (credential === null) {
-				return ephemeral(KEY_MISSING);
+			if (!agentsAvailable(env)) {
+				return ephemeral(AI_UNAVAILABLE_TEXT);
 			}
 			return respondLater(
 				ctx,
@@ -148,7 +150,7 @@ export async function agentSecretsComponent(
 						await deleteAgentSecret(
 							env.DB,
 							userId,
-							agentClient(credential),
+							agentClient(env, userId),
 							id,
 						);
 					} catch (error) {
@@ -194,9 +196,8 @@ export async function submitAgentSecretModal(
 		return ephemeral(INVALID_URL);
 	}
 	const value = readTextInput(interaction, VALUE_INPUT_ID) ?? "";
-	const credential = await loadCredential(env, userId, "anthropic");
-	if (credential === null) {
-		return ephemeral(KEY_MISSING);
+	if (!agentsAvailable(env)) {
+		return ephemeral(AI_UNAVAILABLE_TEXT);
 	}
 	return respondLater(
 		ctx,
@@ -206,11 +207,16 @@ export async function submitAgentSecretModal(
 		async () => {
 			let result: AddSecretResult;
 			try {
-				result = await addAgentSecret(env.DB, userId, agentClient(credential), {
-					name,
-					value,
-					...destination,
-				});
+				result = await addAgentSecret(
+					env.DB,
+					userId,
+					agentClient(env, userId),
+					{
+						name,
+						value,
+						...destination,
+					},
+				);
 			} catch (error) {
 				return { content: await failed(env, userId, "保存でき", error) };
 			}

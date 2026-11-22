@@ -73,7 +73,7 @@ describe("/help", () => {
 			"- `/bobertmd`: Bobert.md(このサーバーの全員への返答で、AIが毎回読む情報や指示)の確認と編集",
 		);
 		expect(lines).toContain(
-			"- `/agent`: Claudeのエージェントに作業を頼む、自分専用のチャンネルの作成(Anthropicのキーが必要)",
+			"- `/agent`: Claudeのエージェントに作業を頼む、自分専用のチャンネルの作成",
 		);
 		expect(lines).toContain(
 			"- `/endagent`: エージェントのセッションの終了(エージェントのチャンネルの中で使う)",

@@ -18,7 +18,6 @@ import {
 	END_CONFIRM,
 	ENDED,
 	GITHUB_LINK_PROMPT,
-	KEY_MISSING,
 	NO_MANAGE_CHANNELS,
 	NOT_AGENT_CHANNEL,
 	OWNER_ONLY_BUTTON,
@@ -35,6 +34,7 @@ import {
 	MessageFlags,
 	PermissionFlags,
 } from "../src/discord/constants";
+import { AI_UNAVAILABLE_TEXT } from "../src/llm/sigw";
 import { resolveSharedChannels } from "../src/queue/channels";
 import {
 	findSharedChannelsByName,
@@ -52,6 +52,7 @@ import {
 	fakeIngestDeps,
 	guildInteraction,
 	mockFetch,
+	openRouterOnlyEnv,
 	sendInteraction,
 	testGuildRoles,
 	userFactory,
@@ -292,13 +293,13 @@ async function seedChannel(
 }
 
 describe("/agent", () => {
-	it("Anthropicのキーがなければ、登録を案内する(OpenRouterだけの人も)", async () => {
-		const user = await newUser("openrouter");
+	it("BobertにAnthropicのsigwのキーがなければ、AIを呼び出せないと知らせる", async () => {
+		const user = await newUser("anthropic");
 		const calls = mockAgentApis();
 
-		await sendInteraction(agentCommand(user));
+		await sendInteraction(agentCommand(user), openRouterOnlyEnv());
 
-		expect(editedContent(calls)).toBe(KEY_MISSING);
+		expect(editedContent(calls)).toBe(AI_UNAVAILABLE_TEXT);
 	});
 
 	it("Bobertに「チャンネルの管理」の権限がなければ、チャンネルを作らずに知らせる", async () => {
@@ -328,7 +329,8 @@ describe("/agent", () => {
 	});
 
 	it("「リポジトリを使わずに始める」で、チャンネルを作り、セッションを始め、最初のメッセージを出す", async () => {
-		const user = await newUser("anthropic");
+		// 本人のキーは要らない。sigw経由で呼ぶ
+		const user = await newUser();
 		const calls = mockAgentApis();
 
 		const response = await sendInteraction(agentCommand(user));
@@ -359,6 +361,12 @@ describe("/agent", () => {
 		});
 		const sessionCall = calls.find(
 			(call) => call.method === "POST" && call.url.pathname === "/v1/sessions",
+		);
+		// Bobert用のsigwのキーで呼び、費用を払う人(本人)を送る。SDKの anthropic-beta はそのまま届く
+		expect(sessionCall?.headers.get("x-api-key")).toBe("sgk-anthropic-test");
+		expect(sessionCall?.headers.get("x-sigw-user")).toBe(user.id);
+		expect(sessionCall?.headers.get("anthropic-beta")).toContain(
+			"managed-agents",
 		);
 		expect(sessionCall?.body).toMatchObject({
 			agent: {
