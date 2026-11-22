@@ -307,7 +307,7 @@ describe("/sigw の登録", () => {
 	it("全角の文字や空白、見えない文字が混ざっていても、整えて登録する", async () => {
 		const user = await newUser();
 		const environment = sigwEnv({ [NEW_KEY]: ["anthropic"] });
-		const typed = ` ｓｇｋ＿ｎｅｗｋｅｙ0000000​wxyz\n`;
+		const typed = ` ｓｇｋ＿ｎｅｗｋｅｙ0000000\u200bwxyz\n`;
 		expect(await sendInteraction(submit(user, typed), environment)).toEqual(
 			ephemeral("sigwキーを登録しました。呼べるプロバイダ: Anthropic"),
 		);
