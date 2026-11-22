@@ -1,11 +1,15 @@
-import { describeError, type KeyCheckResult } from "../llm/types";
+import {
+	type SigwCaller,
+	sigwErrorMessage,
+	sigwTypeSafeFetch,
+} from "../llm/sigw";
+import { describeError } from "../llm/types";
 
 /**
  * TypeSafeのAPI(Jev)。仕様: docs/spec/architecture.md「Jevに聞く」。
+ * sigw経由で、Bobert用のsigwのキーで呼ぶ(費用は、使った人に付ける。docs/spec/llm-cost.md「Jevの費用」)。
  * APIの形: https://docs.typesafe.ai/api/system-one 、エラー: https://docs.typesafe.ai/api/errors
  */
-
-const TYPESAFE_API_BASE = "https://api.typesafe.ai/v1";
 
 /** 使うJevのモデル。いつも最新の正式版を指す別名(数値の境目を決めて使うことはないので、版を固定しない) */
 export const JEV_MODEL = "jev-latest";
@@ -75,6 +79,8 @@ export type JevErrorKind =
 	/** リクエストが大きすぎる(413)。AIに短くさせる */
 	| "too_large"
 	| "unavailable"
+	/** sigw自身が断った(上限額に達した、など)。理由はsigwMessageにある */
+	| "sigw"
 	| "unknown";
 
 /** Jevの呼び出しの失敗 */
@@ -89,25 +95,24 @@ export class JevError extends Error {
 		 * 通信の失敗のときは、原因の説明(describeErrorで作る。ログに残せる)
 		 */
 		readonly detail: string | null = null,
+		/** sigw自身が断ったときの、sigwの文(「[sigw]」で始まる)。送った内容を含まないので、本人に見せられる */
+		readonly sigwMessage: string | null = null,
 	) {
 		super(message);
 		this.name = "JevError";
 	}
 }
 
-/** 本人のTypeSafeのキーで、Jevに質問する */
+/** sigw経由で、Jevに質問する。callerのuserIdは、費用を払う人(使った人) */
 export async function askJev(
-	apiKey: string,
+	caller: SigwCaller,
 	request: JevRequest,
 ): Promise<JevResponse> {
 	let response: Response;
 	try {
-		response = await fetch(`${TYPESAFE_API_BASE}/systemone`, {
+		response = await sigwTypeSafeFetch(caller, "/systemone", {
 			method: "POST",
-			headers: {
-				Authorization: `Bearer ${apiKey}`,
-				"Content-Type": "application/json",
-			},
+			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				model: JEV_MODEL,
 				state: request.state,
@@ -124,6 +129,17 @@ export async function askJev(
 	}
 	const data: unknown = await response.json().catch(() => null);
 	if (!response.ok) {
+		// sigw自身が断ったときは(上限額に達した、など)、sigwの文を本人に見せる
+		const sigw = sigwErrorMessage(isRecord(data) ? data.detail : null);
+		if (sigw !== null) {
+			throw new JevError(
+				"sigw",
+				response.status,
+				`sigw error ${response.status}`,
+				null,
+				sigw,
+			);
+		}
 		const kind = kindFromStatus(response.status);
 		throw new JevError(
 			kind,
@@ -141,33 +157,6 @@ export async function askJev(
 		);
 	}
 	return parsed;
-}
-
-/**
- * 登録するときに、TypeSafeのキーが使えるか確かめる。料金のかからない、モデルの一覧のAPIを呼ぶ
- * (https://docs.typesafe.ai/api/list-models)
- */
-export async function checkTypeSafeKey(
-	apiKey: string,
-): Promise<KeyCheckResult> {
-	let response: Response;
-	try {
-		response = await fetch(`${TYPESAFE_API_BASE}/models`, {
-			headers: { Authorization: `Bearer ${apiKey}` },
-		});
-	} catch (error) {
-		return { status: "unavailable", detail: describeError(error) };
-	}
-	if (response.ok) {
-		return { status: "valid" };
-	}
-	if (response.status === 401 || response.status === 403) {
-		return { status: "invalid" };
-	}
-	return {
-		status: "unavailable",
-		detail: `TypeSafe error ${response.status}`,
-	};
 }
 
 /** TypeSafeのエラーのステータスを、失敗の種類に分ける */

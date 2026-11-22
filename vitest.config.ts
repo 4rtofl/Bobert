@@ -17,6 +17,7 @@ const TEST_SECRETS = {
 	GITHUB_APP_SLUG: "bobert-test",
 	SIGW_ANTHROPIC_KEY: "sgk-anthropic-test",
 	SIGW_OPENROUTER_KEY: "sgk-openrouter-test",
+	SIGW_TYPESAFE_KEY: "sgk-typesafe-test",
 };
 Object.assign(process.env, TEST_SECRETS);
 

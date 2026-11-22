@@ -65,7 +65,7 @@ export async function deleteCommand(
 		type: InteractionResponseType.ChannelMessageWithSource,
 		data: {
 			flags: MessageFlags.Ephemeral,
-			content: `登録したAPIキー(Anthropic、OpenRouter、TypeSafe)と設定を、すべて削除します。${donation}${memory}${agents}${video}${github}よろしいですか?`,
+			content: `登録したAPIキー(Anthropic、OpenRouter)と設定を、すべて削除します。${donation}${memory}${agents}${video}${github}よろしいですか?`,
 			components: [
 				{
 					type: ComponentType.ActionRow,

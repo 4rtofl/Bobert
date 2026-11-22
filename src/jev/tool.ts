@@ -1,3 +1,4 @@
+import type { SigwCaller } from "../llm/sigw";
 import type { ChatTool, ToolResult } from "../llm/types";
 import { logEvent } from "../log";
 import type { StoredMessageInput } from "../queue/messages";
@@ -110,11 +111,11 @@ const CRITERION_SCHEMA = {
 };
 
 /**
- * 「Jevに聞く」の道具。apiKeyは、選んだ人のTypeSafeのキー。targetは、Jevに聞く対象のメッセージ。
+ * 「Jevに聞く」の道具。callerは、sigwでJevを呼ぶときの、費用を払う人(選んだ人)。targetは、Jevに聞く対象のメッセージ。
  * 使った結果は、outcomeに書き込む
  */
 export function askJevTool(
-	apiKey: string,
+	caller: SigwCaller,
 	target: StoredMessageInput,
 	outcome: JevOutcome,
 ): ChatTool {
@@ -197,7 +198,7 @@ export function askJevTool(
 			const { request, questions } = buildJevRequest(target, parsed.ask);
 			outcome.calls++;
 			try {
-				const response = await askJev(apiKey, request);
+				const response = await askJev(caller, request);
 				outcome.answered = { questions, response };
 				outcome.error = null;
 				log("answered", {
@@ -221,6 +222,9 @@ export function askJevTool(
 					kind: failure.kind,
 					status: failure.status,
 					...(failure.status === null ? { detail: failure.detail } : {}),
+					...(failure.sigwMessage === null
+						? {}
+						: { sigwMessage: failure.sigwMessage }),
 				});
 				if (canRetry(outcome)) {
 					return rejectedMessage(failure);

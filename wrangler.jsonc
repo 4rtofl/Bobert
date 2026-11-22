@@ -26,7 +26,9 @@
 			"GITHUB_APP_SLUG",
 			// AIの呼び出しに使う、Bobert用のsigwのキー(docs/setup.md「sigw」)。空にしたプロバイダのモデルは使えない
 			"SIGW_ANTHROPIC_KEY",
-			"SIGW_OPENROUTER_KEY"
+			"SIGW_OPENROUTER_KEY",
+			// Jevの呼び出しに使う、Bobert用のsigwのキー。空なら、Jevは使えない
+			"SIGW_TYPESAFE_KEY"
 		]
 	},
 	// AIの呼び出しを中継するsigw(4rtofl/si-gateway)のWorker。Service Bindingで、Bobert用の入口を呼ぶ
@@ -131,7 +133,8 @@
 					"GITHUB_APP_CLIENT_SECRET",
 					"GITHUB_APP_SLUG",
 					"SIGW_ANTHROPIC_KEY",
-					"SIGW_OPENROUTER_KEY"
+					"SIGW_OPENROUTER_KEY",
+					"SIGW_TYPESAFE_KEY"
 				]
 			},
 			"services": [

@@ -811,7 +811,7 @@ describe("/delete と寄付", () => {
 
 		const body = await deleteCommand(alice);
 		expect(body.data.content).toBe(
-			"登録したAPIキー(Anthropic、OpenRouter、TypeSafe)と設定を、すべて削除します。寄付したクレジットも、使われなくなります。よろしいですか?",
+			"登録したAPIキー(Anthropic、OpenRouter)と設定を、すべて削除します。寄付したクレジットも、使われなくなります。よろしいですか?",
 		);
 
 		await sendInteraction(
@@ -827,7 +827,7 @@ describe("/delete と寄付", () => {
 	it("寄付していない人には、今までどおりに確かめる", async () => {
 		const body = await deleteCommand(await withAnthropicKey("bob"));
 		expect(body.data.content).toBe(
-			"登録したAPIキー(Anthropic、OpenRouter、TypeSafe)と設定を、すべて削除します。よろしいですか?",
+			"登録したAPIキー(Anthropic、OpenRouter)と設定を、すべて削除します。よろしいですか?",
 		);
 	});
 });

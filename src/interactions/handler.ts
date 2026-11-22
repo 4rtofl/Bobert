@@ -85,11 +85,8 @@ import { settingsCommand } from "./settings";
 import {
 	anthropicKeyModal,
 	SETUP_ANTHROPIC_ID,
-	SETUP_TYPESAFE_ID,
 	setupCommand,
 	submitAnthropicKey,
-	submitTypeSafeKey,
-	typeSafeKeyModal,
 } from "./setup";
 import {
 	SKILLS_COMMAND_NAME,
@@ -306,9 +303,6 @@ async function route(
 			if (interaction.data.custom_id === SETUP_ANTHROPIC_ID) {
 				return anthropicKeyModal();
 			}
-			if (interaction.data.custom_id === SETUP_TYPESAFE_ID) {
-				return typeSafeKeyModal();
-			}
 			if (interaction.data.custom_id.startsWith(FEAT_BUTTON_PREFIX)) {
 				const toggled = await toggleFeature(
 					env,
@@ -404,9 +398,6 @@ async function route(
 		case InteractionType.ModalSubmit:
 			if (interaction.data.custom_id === SETUP_ANTHROPIC_ID) {
 				return submitAnthropicKey(interaction, env, ctx, user.id);
-			}
-			if (interaction.data.custom_id === SETUP_TYPESAFE_ID) {
-				return submitTypeSafeKey(interaction, env, ctx, user.id);
 			}
 			if (interaction.data.custom_id === MODEL_CUSTOM_ID) {
 				return submitCustomModel(interaction, env, ctx, user.id);

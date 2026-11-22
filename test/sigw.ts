@@ -1,11 +1,12 @@
 /**
  * テスト用の、sigwの偽物。受けたリクエストを、ヘッダーもそのままに、プロバイダのURLへ送り直す。
  * 送り直しはその時点のfetchで行うので、mockFetch(test/helpers.ts)で置き換えたfetchが受け取る。
- * テストでは、プロバイダのホスト名(api.anthropic.com、openrouter.ai)で、どちらへの呼び出しかを見分ける
+ * テストでは、プロバイダのホスト名(api.anthropic.com、openrouter.ai、api.typesafe.ai)で、どちらへの呼び出しかを見分ける
  */
 const UPSTREAMS: Record<string, string> = {
 	anthropic: "https://api.anthropic.com",
 	openrouter: "https://openrouter.ai",
+	typesafe: "https://api.typesafe.ai",
 };
 
 export const fakeSigw = {

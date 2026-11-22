@@ -1,25 +1,18 @@
 import { env } from "cloudflare:workers";
 import type { APIMessage } from "discord-api-types/v10";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-	ComponentType,
-	InteractionResponseType,
-	InteractionType,
-	MessageFlags,
-} from "../src/discord/constants";
+import { InteractionType } from "../src/discord/constants";
 import { COMMANDS } from "../src/interactions/commands";
 import { helpText } from "../src/interactions/help";
 import { JEV_SYSTEM_PROMPT } from "../src/jev/prompt";
 import {
 	JEV_COMMAND_NO_TOOLS,
-	JEV_COMMAND_TYPESAFE_KEY_REQUIRED,
 	JEV_ERROR,
 	JEV_NO_QUESTION,
-	TYPESAFE_KEY_INVALID,
-	TYPESAFE_KEY_REQUIRED,
 } from "../src/jev/texts";
 import { parseAsk } from "../src/jev/tool";
 import { clearModelInfoCache } from "../src/llm/model-info";
+import { AI_UNAVAILABLE_TEXT } from "../src/llm/sigw";
 import type {
 	JevJob,
 	QueueMessage,
@@ -29,12 +22,6 @@ import { fromDiscord } from "../src/respond/history";
 import { handleJevJob } from "../src/respond/jev";
 import { RATE_LIMITED_TEXT } from "../src/respond/replies";
 import {
-	hasTypeSafeKey,
-	loadTypeSafeKey,
-	saveTypeSafeKey,
-} from "../src/store/typesafe";
-import {
-	deleteUserData,
 	type Provider,
 	saveCredential,
 	updateUserSettings,
@@ -65,7 +52,11 @@ afterEach(() => {
 const GUILD_ID = "900";
 /** 頼まれた時刻(日本時間で2026-10-28(水) 10:00) */
 const REQUESTED_AT = Date.parse("2026-10-28T01:00:00.000Z");
-const TYPESAFE_KEY = "ts-test-key-123";
+
+/** BobertにTypeSafe用のsigwのキーがない環境(Jevを呼び出せない) */
+function noTypeSafeEnv(base: Env): Env {
+	return { ...base, SIGW_TYPESAFE_KEY: "" };
+}
 
 /** 応答用のQueueの偽物。入れた仕事を記録する */
 function fakeQueues() {
@@ -85,19 +76,12 @@ function fakeQueues() {
 }
 
 /** キーを登録した人(このファイルのユーザーIDは65000番台) */
-async function registered(
-	id: string,
-	providers: Provider[],
-	typeSafe: boolean,
-) {
+async function registered(id: string, providers: Provider[]) {
 	for (const provider of providers) {
 		await saveCredential(env, id, provider, {
 			apiKey: `key-${provider}`,
 			workspaceId: null,
 		});
-	}
-	if (typeSafe) {
-		await saveTypeSafeKey(env, id, TYPESAFE_KEY);
 	}
 	return { ...BOB, id };
 }
@@ -298,13 +282,13 @@ describe("右クリックメニューの「Jevに聞く」", () => {
 			expect.objectContaining({ type: 3, name: "Jevに聞く" }),
 		);
 		expect(helpText()).toContain(
-			"- メッセージの右クリックメニュー(アプリ)の「Jevに聞く」: AIがメッセージと前後の会話を読んで質問を作り、Jevが確率で答えます。TypeSafeのAPIキーの登録が必要です",
+			"- メッセージの右クリックメニュー(アプリ)の「Jevに聞く」: AIがメッセージと前後の会話を読んで質問を作り、Jevが確率で答えます",
 		);
 	});
 
-	it("AIのキーとTypeSafeのキーがあれば、チャンネルに見える保留の応答を返し、仕事を入れる", async () => {
+	it("AIとJevを呼び出せれば、チャンネルに見える保留の応答を返し、仕事を入れる", async () => {
 		const { environment, sent } = fakeQueues();
-		const user = await registered("65001", ["anthropic"], true);
+		const user = await registered("65001", ["anthropic"]);
 		const target = discordMessage("65100", ALICE, "日本の首都は大阪だよね?");
 
 		const body = await sendInteraction(
@@ -330,26 +314,26 @@ describe("右クリックメニューの「Jevに聞く」", () => {
 		]);
 	});
 
-	it("TypeSafeのキーを登録していなければ、登録方法を本人にだけ見せ、仕事は入れない", async () => {
+	it("BobertにTypeSafe用のsigwのキーがなければ、呼び出せないことを本人にだけ見せ、仕事は入れない", async () => {
 		const { environment, sent } = fakeQueues();
-		const user = await registered("65002", ["anthropic"], false);
+		const user = await registered("65002", ["anthropic"]);
 		const target = discordMessage("65101", ALICE, "おはよう");
 
 		const body = await sendInteraction(
 			menuInteraction(user, target),
-			environment,
+			noTypeSafeEnv(environment),
 		);
 
 		expect(body).toEqual({
 			type: 4,
-			data: { content: TYPESAFE_KEY_REQUIRED, flags: 64 },
+			data: { content: AI_UNAVAILABLE_TEXT, flags: 64 },
 		});
 		expect(sent).toEqual([]);
 	});
 
 	it("Bobertにsigwのキーがなければ、AIを呼び出せないことを本人にだけ見せる", async () => {
 		const { environment, sent } = fakeQueues();
-		const user = await registered("65003", [], true);
+		const user = await registered("65003", []);
 		const target = discordMessage("65102", ALICE, "おはよう");
 
 		const body = await sendInteraction(
@@ -367,7 +351,7 @@ describe("右クリックメニューの「Jevに聞く」", () => {
 describe("「Jevに聞く」の仕事", () => {
 	it("AIが作った質問でJevに聞き、AIには結果を返さずに、Jevの回答を投稿する", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65010", ["anthropic"], true);
+		const user = await registered("65010", ["anthropic"]);
 		const target = discordMessage("65110", ALICE, "日本の首都は大阪だよね?");
 		const calls = mockApis([], {
 			ai: () => askJev(NOUL_INPUT),
@@ -411,10 +395,14 @@ describe("「Jevに聞く」の仕事", () => {
 			"ask_jev",
 		]);
 
+		// sigw経由で、TypeSafe用のsigwのキーで呼び、費用を払う人(選んだ人)を伝える
 		const [jev] = jevCalls(calls);
 		expect(jev?.method).toBe("POST");
 		expect(jev?.url.href).toBe("https://api.typesafe.ai/v1/systemone");
-		expect(jev?.headers.get("Authorization")).toBe(`Bearer ${TYPESAFE_KEY}`);
+		expect(jev?.headers.get("Authorization")).toBe(
+			`Bearer ${env.SIGW_TYPESAFE_KEY}`,
+		);
+		expect(jev?.headers.get("x-sigw-user")).toBe(user.id);
 		expect(jev?.body).toEqual({
 			model: "jev-latest",
 			state: {
@@ -448,7 +436,7 @@ describe("「Jevに聞く」の仕事", () => {
 
 	it("選択肢は確率の高い順に、段階は低い順に並べ、いちばん高いものを太字にする", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65011", ["anthropic"], true);
+		const user = await registered("65011", ["anthropic"]);
 		const target = discordMessage(
 			"65120",
 			ALICE,
@@ -555,7 +543,7 @@ describe("「Jevに聞く」の仕事", () => {
 
 	it("対象のメッセージが返信なら、返信先を読む道具も渡す", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65012", ["anthropic"], true);
+		const user = await registered("65012", ["anthropic"]);
 		const parent = discordMessage("65130", BOB, "明日の集まり、来る?");
 		const target = discordReply("65131", ALICE, "たぶん", parent);
 		const calls = mockApis([parent], {
@@ -584,7 +572,7 @@ describe("「Jevに聞く」の仕事", () => {
 
 	it("入力が正しくなければ、Jevを呼ばずに理由をAIに返し、直した入力で聞く", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65013", ["anthropic"], true);
+		const user = await registered("65013", ["anthropic"]);
 		const target = discordMessage("65140", ALICE, "どれがいい?");
 		let round = 0;
 		const calls = mockApis([], {
@@ -629,7 +617,7 @@ describe("「Jevに聞く」の仕事", () => {
 
 	it("Jevがリクエストを受け付けなければ、理由をAIに返して直してもらう", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65014", ["anthropic"], true);
+		const user = await registered("65014", ["anthropic"]);
 		const target = discordMessage("65150", ALICE, "本当?");
 		let round = 0;
 		const calls = mockApis([], {
@@ -671,7 +659,7 @@ describe("「Jevに聞く」の仕事", () => {
 	});
 
 	it.each([
-		{ status: 401, text: TYPESAFE_KEY_INVALID, userId: "65021" },
+		{ status: 401, text: AI_UNAVAILABLE_TEXT, userId: "65021" },
 		{ status: 429, text: RATE_LIMITED_TEXT, userId: "65022" },
 		{ status: 529, text: JEV_ERROR, userId: "65023" },
 	])(
@@ -679,7 +667,7 @@ describe("「Jevに聞く」の仕事", () => {
 		"Jevの呼び出しが「$status」で失敗したら、AIに続きを頼まずに理由を投稿する",
 		async ({ status, text, userId }) => {
 			const { environment } = fakeQueues();
-			const user = await registered(userId, ["anthropic"], true);
+			const user = await registered(userId, ["anthropic"]);
 			const target = discordMessage("65160", ALICE, "本当?");
 			const calls = mockApis([], {
 				ai: () => askJev(NOUL_INPUT),
@@ -695,7 +683,7 @@ describe("「Jevに聞く」の仕事", () => {
 
 	it("同じ回に2回呼ばれても、直せない失敗の後は、もうJevを呼ばない", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65024", ["anthropic"], true);
+		const user = await registered("65024", ["anthropic"]);
 		const target = discordMessage("65165", ALICE, "本当?");
 		const calls = mockApis([], {
 			ai: () =>
@@ -723,12 +711,35 @@ describe("「Jevに聞く」の仕事", () => {
 
 		expect(jevCalls(calls)).toHaveLength(1);
 		expect(anthropicRequests(calls)).toHaveLength(1);
-		expect(postedResult(calls)?.content).toBe(TYPESAFE_KEY_INVALID);
+		expect(postedResult(calls)?.content).toBe(AI_UNAVAILABLE_TEXT);
 	});
+
+	it.each([
+		{ status: 400, userId: "65025" },
+		{ status: 402, userId: "65026" },
+	])(
+		"sigw自身が「$status」で断ったら、AIに直させずに、sigwの文を理由として投稿する",
+		async ({ status, userId }) => {
+			const { environment } = fakeQueues();
+			const user = await registered(userId, ["anthropic"]);
+			const target = discordMessage("65167", ALICE, "本当?");
+			const sigwText = "[sigw] 今月の上限額に達しました";
+			const calls = mockApis([], {
+				ai: () => askJev(NOUL_INPUT),
+				jev: () => Response.json({ detail: sigwText }, { status }),
+			});
+
+			await handleJevJob(jevJob(user, target, `6516${status}`), environment);
+
+			expect(jevCalls(calls)).toHaveLength(1);
+			expect(anthropicRequests(calls)).toHaveLength(1);
+			expect(postedResult(calls)?.content).toBe(sigwText);
+		},
+	);
 
 	it("AIがJevに聞かずに終えたら、質問を作れなかったと投稿する", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65030", ["anthropic"], true);
+		const user = await registered("65030", ["anthropic"]);
 		const target = discordMessage("65170", ALICE, "おはよう");
 		const calls = mockApis([], {
 			ai: () => anthropicStreamOf([{ type: "text", text: "挨拶だね" }]),
@@ -740,23 +751,26 @@ describe("「Jevに聞く」の仕事", () => {
 		expect(postedResult(calls)?.content).toBe(JEV_NO_QUESTION);
 	});
 
-	it("選んだ後にTypeSafeのキーが消されていたら、AIを呼ばずに登録方法を投稿する", async () => {
+	it("選んだ後にTypeSafe用のsigwのキーが外されていたら、AIを呼ばずに、呼び出せないことを投稿する", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65031", ["anthropic"], false);
+		const user = await registered("65031", ["anthropic"]);
 		const target = discordMessage("65180", ALICE, "本当?");
 		const calls = mockApis([], {
 			ai: () => askJev(NOUL_INPUT),
 		});
 
-		await handleJevJob(jevJob(user, target, "65181"), environment);
+		await handleJevJob(
+			jevJob(user, target, "65181"),
+			noTypeSafeEnv(environment),
+		);
 
 		expect(anthropicRequests(calls)).toHaveLength(0);
-		expect(postedResult(calls)?.content).toBe(TYPESAFE_KEY_REQUIRED);
+		expect(postedResult(calls)?.content).toBe(AI_UNAVAILABLE_TEXT);
 	});
 
 	it("同じ仕事は2回投稿しない", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65032", ["anthropic"], true);
+		const user = await registered("65032", ["anthropic"]);
 		const target = discordMessage("65190", ALICE, "本当?");
 		const job = jevJob(user, target, "65191");
 		const calls = mockApis([], {
@@ -773,7 +787,7 @@ describe("「Jevに聞く」の仕事", () => {
 
 	it("OpenRouterのモデルでも、Jevが答えたらAIとのやり取りを終える", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65033", ["openrouter"], true);
+		const user = await registered("65033", ["openrouter"]);
 		const target = discordMessage("65200", ALICE, "本当?");
 		const calls = mockApis([], {
 			ai: () =>
@@ -818,7 +832,7 @@ describe("「Jevに聞く」の仕事", () => {
 describe("/jev", () => {
 	it("聞くことの入力欄を付けて登録し、/helpのコマンドの一覧にも出す", () => {
 		const description =
-			"Jev(TypeSafeの判定モデル)に聞く。AIが会話を読んで質問を作り、Jevが確率で答える(TypeSafeのキーが必要)";
+			"Jev(TypeSafeの判定モデル)に聞く。AIが会話を読んで質問を作り、Jevが確率で答える";
 		expect(COMMANDS).toContainEqual(
 			expect.objectContaining({
 				type: 1,
@@ -839,9 +853,9 @@ describe("/jev", () => {
 		expect(helpText()).toContain(`- \`/jev\`: ${description}`);
 	});
 
-	it("AIのキーとTypeSafeのキーがあれば、チャンネルに見える保留の応答を返し、入力を対象のメッセージにした仕事を入れる", async () => {
+	it("AIとJevを呼び出せれば、チャンネルに見える保留の応答を返し、入力を対象のメッセージにした仕事を入れる", async () => {
 		const { environment, sent } = fakeQueues();
-		const user = await registered("65060", ["anthropic"], true);
+		const user = await registered("65060", ["anthropic"]);
 
 		const body = await sendInteraction(
 			commandInteraction(user, "  明日の集まりは雨で中止になりそう?  "),
@@ -883,25 +897,25 @@ describe("/jev", () => {
 		]);
 	});
 
-	it("TypeSafeのキーを登録していなければ、/jevの登録方法を本人にだけ見せ、仕事は入れない", async () => {
+	it("BobertにTypeSafe用のsigwのキーがなければ、呼び出せないことを本人にだけ見せ、仕事は入れない", async () => {
 		const { environment, sent } = fakeQueues();
-		const user = await registered("65061", ["anthropic"], false);
+		const user = await registered("65061", ["anthropic"]);
 
 		const body = await sendInteraction(
 			commandInteraction(user, "本当?"),
-			environment,
+			noTypeSafeEnv(environment),
 		);
 
 		expect(body).toEqual({
 			type: 4,
-			data: { content: JEV_COMMAND_TYPESAFE_KEY_REQUIRED, flags: 64 },
+			data: { content: AI_UNAVAILABLE_TEXT, flags: 64 },
 		});
 		expect(sent).toEqual([]);
 	});
 
 	it("入力された聞くことを対象のメッセージにして、右クリックメニューと同じ渡し方でJevに聞く", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65062", ["anthropic"], true);
+		const user = await registered("65062", ["anthropic"]);
 		const calls = mockApis([], {
 			ai: () => askJev(NOUL_INPUT),
 			jev: () => jevAnswered({ q1: { type: "noul", noul: 0.03 } }),
@@ -947,22 +961,23 @@ describe("/jev", () => {
 		expect(saved).toBe(0);
 	});
 
-	it("使った後にTypeSafeのキーが消されていたら、AIを呼ばずに/jevの登録方法を投稿する", async () => {
+	it("使った後にTypeSafe用のsigwのキーが外されていたら、AIを呼ばずに、呼び出せないことを投稿する", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65063", ["anthropic"], false);
+		const user = await registered("65063", ["anthropic"]);
 		const calls = mockApis([], { ai: () => askJev(NOUL_INPUT) });
 
-		await handleJevJob(commandJob(user, "本当?", "65301"), environment);
+		await handleJevJob(
+			commandJob(user, "本当?", "65301"),
+			noTypeSafeEnv(environment),
+		);
 
 		expect(anthropicRequests(calls)).toHaveLength(0);
-		expect(postedResult(calls)?.content).toBe(
-			JEV_COMMAND_TYPESAFE_KEY_REQUIRED,
-		);
+		expect(postedResult(calls)?.content).toBe(AI_UNAVAILABLE_TEXT);
 	});
 
 	it("道具を使えないモデルでは、/jevを使えないと投稿する", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65064", ["openrouter"], true);
+		const user = await registered("65064", ["openrouter"]);
 		await updateUserSettings(env.DB, user.id, {
 			modelKey: "custom",
 			customModelId: "x-ai/old-model",
@@ -988,7 +1003,7 @@ describe("/jev", () => {
 describe("「Jevに聞く」の道具の入力", () => {
 	it("表示する文の改行は空白にし、Markdownの記号はそのまま表示する", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65040", ["anthropic"], true);
+		const user = await registered("65040", ["anthropic"]);
 		const target = discordMessage("65210", ALICE, "本当?");
 		const calls = mockApis([], {
 			ai: () =>
@@ -1047,31 +1062,8 @@ describe("「Jevに聞く」の道具の入力", () => {
 	});
 });
 
-describe("/setup のTypeSafeのキー", () => {
-	/** TypeSafeのキーの登録のモーダルの送信 */
-	function typeSafeModalSubmit(apiKey: string, userId: string) {
-		return guildInteraction(
-			InteractionType.ModalSubmit,
-			{
-				custom_id: "setup:typesafe",
-				components: [
-					{
-						type: ComponentType.Label,
-						id: 1,
-						component: {
-							type: ComponentType.TextInput,
-							id: 2,
-							custom_id: "api_key",
-							value: apiKey,
-						},
-					},
-				],
-			},
-			{ ...ALICE, id: userId },
-		);
-	}
-
-	it("/setupに、TypeSafeの登録の状態と、登録のボタンを出す", async () => {
+describe("TypeSafeのキーの登録をなくした後", () => {
+	it("/setupに、TypeSafeの行とボタンを出さない", async () => {
 		mockFetch(() => Response.json({}));
 		const body = await sendInteraction(
 			guildInteraction(
@@ -1087,91 +1079,21 @@ describe("/setup のTypeSafeのキー", () => {
 				"",
 				"- Anthropic: 未登録",
 				"- OpenRouter: 未連携",
-				"- TypeSafe: 未登録",
 				"",
 				"-# OpenRouterとの連携のリンクは10分間有効です。",
-				"-# TypeSafeのキーは、右クリックメニューの「Jevに聞く」と `/jev` で使います。",
 			].join("\n"),
 		);
-		expect(body.data.components[0].components[2]).toMatchObject({
-			custom_id: "setup:typesafe",
-			label: "TypeSafeのキーを登録",
-		});
+		expect(
+			body.data.components[0].components.map(
+				(button: { label: string }) => button.label,
+			),
+		).toEqual(["Anthropicのキーを登録", "OpenRouterと連携"]);
 	});
 
-	it("ボタンを押すと、キーを入力するモーダルを開く", async () => {
-		const body = await sendInteraction(
-			guildInteraction(InteractionType.MessageComponent, {
-				custom_id: "setup:typesafe",
-				component_type: ComponentType.Button,
-			}),
-		);
-
-		expect(body.type).toBe(InteractionResponseType.Modal);
-		expect(body.data.title).toBe("TypeSafeのAPIキーの登録");
-		expect(body.data.components[0]).toMatchObject({
-			label: "APIキー",
-			description: "TypeSafeのコンソール(console.typesafe.ai)で発行したキー",
-			component: { custom_id: "api_key", required: true },
-		});
-	});
-
-	it("入力されたキーが有効なら、暗号化して保存し、結果を知らせる", async () => {
-		const calls = mockFetch(({ url }) =>
-			url.hostname === "api.typesafe.ai"
-				? Response.json({ models: [] })
-				: Response.json({}),
-		);
-
-		const body = await sendInteraction(
-			typeSafeModalSubmit(" ts-valid-key ", "65051"),
-		);
-
-		expect(body).toEqual({
-			type: InteractionResponseType.DeferredChannelMessageWithSource,
-			data: { flags: MessageFlags.Ephemeral },
-		});
-		// 料金のかからない、モデルの一覧のAPIで確かめる。入力の前後の空白は取り除く
-		const check = calls.find((call) => call.url.hostname === "api.typesafe.ai");
-		expect(check?.url.href).toBe("https://api.typesafe.ai/v1/models");
-		expect(check?.headers.get("Authorization")).toBe("Bearer ts-valid-key");
-		expect(await loadTypeSafeKey(env, "65051")).toBe("ts-valid-key");
-		// 暗号化して保存する
-		const row = await env.DB.prepare(
-			"SELECT ciphertext FROM typesafe_credentials WHERE user_id = ?",
-		)
-			.bind("65051")
-			.first<string>("ciphertext");
-		expect(row).not.toContain("ts-valid-key");
-		const edit = calls.find((call) => call.url.hostname === "discord.com");
-		expect(edit?.body).toEqual({
-			content:
-				"TypeSafeのAPIキーを登録しました。メッセージの右クリックメニュー(アプリ)の「Jevに聞く」と `/jev` で使えます。",
-		});
-	});
-
-	it("キーが使えなければ、保存せずに知らせる", async () => {
-		const calls = mockFetch(({ url }) =>
-			url.hostname === "api.typesafe.ai"
-				? Response.json({ detail: "invalid" }, { status: 401 })
-				: Response.json({}),
-		);
-
-		await sendInteraction(typeSafeModalSubmit("ts-invalid-key", "65052"));
-
-		expect(await hasTypeSafeKey(env.DB, "65052")).toBe(false);
-		const edit = calls.find((call) => call.url.hostname === "discord.com");
-		expect(edit?.body).toEqual({
-			content:
-				"このAPIキーは使えませんでした。キーを確かめて、もう一度登録してください。",
-		});
-	});
-
-	it("/deleteで、TypeSafeのキーも消す", async () => {
-		await saveTypeSafeKey(env, "65053", TYPESAFE_KEY);
-
-		await deleteUserData(env.DB, "65053");
-
-		expect(await hasTypeSafeKey(env.DB, "65053")).toBe(false);
+	it("登録したTypeSafeのキーを保存していた表を消す", async () => {
+		const table = await env.DB.prepare(
+			"SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'typesafe_credentials'",
+		).first();
+		expect(table).toBeNull();
 	});
 });

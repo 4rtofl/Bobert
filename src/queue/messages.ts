@@ -61,7 +61,7 @@ export interface ExplainJob {
 
 /**
  * 右クリックメニューの「Jevに聞く」と`/jev`。使った人のキーと設定で、AIにJevへの質問を作ってもらい、
- * 使った人のTypeSafeのキーでJevに聞いて、保留にした応答(チャンネルに見える)を、Jevの回答に書き換える。
+ * sigw経由でJevに聞いて、保留にした応答(チャンネルに見える)を、Jevの回答に書き換える。
  */
 export interface JevJob {
 	kind: "jev";
@@ -74,7 +74,7 @@ export interface JevJob {
 	interactionId: string;
 	/** Interactionのトークン。保留にした応答を書き換えるのに使う(15分で切れる) */
 	interactionToken: string;
-	/** 使った人。この人の資格情報と設定とTypeSafeのキーを使う */
+	/** 使った人。この人の設定を使い、AIとJevの費用をこの人に付ける */
 	userId: string;
 	/** 使った人の、サーバーで見えている名前 */
 	userName: string;

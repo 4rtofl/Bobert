@@ -9,7 +9,7 @@ export const JEV_COMMAND_NAME = "Jevに聞く";
 /** スラッシュコマンド`/jev`の名前と説明 */
 export const JEV_SLASH_COMMAND_NAME = "jev";
 export const JEV_SLASH_COMMAND_DESCRIPTION =
-	"Jev(TypeSafeの判定モデル)に聞く。AIが会話を読んで質問を作り、Jevが確率で答える(TypeSafeのキーが必要)";
+	"Jev(TypeSafeの判定モデル)に聞く。AIが会話を読んで質問を作り、Jevが確率で答える";
 
 /** `/jev`の入力欄(聞くこと)の名前と説明 */
 export const JEV_QUESTION_OPTION = "question";
@@ -23,24 +23,7 @@ export const JEV_QUESTION_MAX_LENGTH = 1000;
 export type JevSource = "menu" | "command";
 
 /** /help に書く行 */
-export const JEV_HELP_LINE = `- メッセージの右クリックメニュー(アプリ)の「${JEV_COMMAND_NAME}」: AIがメッセージと前後の会話を読んで質問を作り、Jevが確率で答えます。TypeSafeのAPIキーの登録が必要です`;
-
-/** TypeSafeのキーを登録していない人への案内(本人にだけ見せる) */
-export const TYPESAFE_KEY_REQUIRED = `「${JEV_COMMAND_NAME}」を使うには、TypeSafeのAPIキーの登録が必要です。\`/setup\` から登録してください。費用は、登録した本人のアカウントに請求されます。`;
-
-/** `/jev`で、TypeSafeのキーを登録していない人への案内(本人にだけ見せる) */
-export const JEV_COMMAND_TYPESAFE_KEY_REQUIRED = `\`/${JEV_SLASH_COMMAND_NAME}\` を使うには、TypeSafeのAPIキーの登録が必要です。\`/setup\` から登録してください。費用は、登録した本人のアカウントに請求されます。`;
-
-/** 使った方法に合わせた、TypeSafeのキーを登録していない人への案内 */
-export function typeSafeKeyRequired(source: JevSource): string {
-	return source === "command"
-		? JEV_COMMAND_TYPESAFE_KEY_REQUIRED
-		: TYPESAFE_KEY_REQUIRED;
-}
-
-/** 登録したTypeSafeのキーが無効なときの返答(結果の代わりに投稿する) */
-export const TYPESAFE_KEY_INVALID =
-	"TypeSafeのAPIキーが無効です。`/setup` から登録し直してください。";
+export const JEV_HELP_LINE = `- メッセージの右クリックメニュー(アプリ)の「${JEV_COMMAND_NAME}」: AIがメッセージと前後の会話を読んで質問を作り、Jevが確率で答えます`;
 
 /** AIが、Jevに聞く質問を作らずに終えたときの返答 */
 export const JEV_NO_QUESTION =
@@ -56,12 +39,6 @@ export const JEV_COMMAND_NO_TOOLS = `このモデルは道具を使えないた�
 export function jevNoTools(source: JevSource): string {
 	return source === "command" ? JEV_COMMAND_NO_TOOLS : JEV_NO_TOOLS;
 }
-
-/** /setup の画面の注記(TypeSafeのキーを使う場面) */
-export const TYPESAFE_KEY_NOTE = `-# TypeSafeのキーは、右クリックメニューの「${JEV_COMMAND_NAME}」と \`/${JEV_SLASH_COMMAND_NAME}\` で使います。`;
-
-/** TypeSafeのキーを登録したときの知らせ */
-export const TYPESAFE_KEY_REGISTERED = `TypeSafeのAPIキーを登録しました。メッセージの右クリックメニュー(アプリ)の「${JEV_COMMAND_NAME}」と \`/${JEV_SLASH_COMMAND_NAME}\` で使えます。`;
 
 /** Jevの呼び出しで、原因の分からないエラーが起きたときの返答 */
 export const JEV_ERROR =
