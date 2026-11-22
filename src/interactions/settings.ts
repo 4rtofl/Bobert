@@ -52,7 +52,7 @@ async function settingsMessage(
 		guildId === undefined ? null : loadMemory(env.DB, userId, guildId),
 	]);
 	// モデルは、Bobertにあるsigwのキーで呼ぶ
-	const resolution = resolveModel(settings, sigwProviders(env));
+	const resolution = resolveModel(settings, await sigwProviders(env));
 	const lines = [
 		`- モデル: ${modelLine(settings, resolution)}`,
 		`- 思考の深さ: ${

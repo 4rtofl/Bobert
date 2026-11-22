@@ -23,7 +23,10 @@ export async function explainFromMenu(
 	user: APIUser,
 ): Promise<APIInteractionResponse> {
 	const guildId = interaction.guild_id ?? null;
-	const paid = resolveReplyModel(env, await getUserSettings(env.DB, user.id));
+	const paid = await resolveReplyModel(
+		env,
+		await getUserSettings(env.DB, user.id),
+	);
 	if (!paid.ok) {
 		return {
 			type: InteractionResponseType.ChannelMessageWithSource,

@@ -19,6 +19,7 @@ import {
 	sendInteraction,
 	userFactory,
 } from "./helpers";
+import { TEST_SIGW_KEY } from "./sigw";
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -257,7 +258,7 @@ describe("/effort", () => {
 		const check = calls.find(
 			(call) => call.url.hostname === "api.anthropic.com",
 		);
-		expect(check?.headers.get("x-api-key")).toBe("sgk-anthropic-test");
+		expect(check?.headers.get("x-api-key")).toBe(TEST_SIGW_KEY);
 		expect(check?.headers.get("x-sigw-user")).toBe(user.id);
 		expect(
 			menuOptions(calls).map((option: { value: string }) => option.value),

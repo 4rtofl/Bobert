@@ -38,7 +38,9 @@ import {
 	noSigwEnv,
 	openRouterOnlyEnv,
 	sendInteraction,
+	sigwProvidersEnv,
 } from "./helpers";
+import { TEST_SIGW_KEY } from "./sigw";
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -49,9 +51,9 @@ const GUILD_ID = "900";
 /** 頼まれた時刻(日本時間で2026-10-28(水) 10:00) */
 const REQUESTED_AT = Date.parse("2026-10-28T01:00:00.000Z");
 
-/** BobertにTypeSafe用のsigwのキーがない環境(Jevを呼び出せない) */
+/** Bobertのsigwのキーで、TypeSafeを呼べない環境(Jevを呼び出せない) */
 function noTypeSafeEnv(base: Env): Env {
-	return { ...base, SIGW_TYPESAFE_KEY: "" };
+	return sigwProvidersEnv(["anthropic", "openrouter"], base);
 }
 
 /** 応答用のQueueの偽物。入れた仕事を記録する */
@@ -385,13 +387,11 @@ describe("「Jevに聞く」の仕事", () => {
 			"ask_jev",
 		]);
 
-		// sigw経由で、TypeSafe用のsigwのキーで呼び、費用を払う人(選んだ人)を伝える
+		// sigw経由で、Bobertのsigwのキーで呼び、費用を払う人(選んだ人)を伝える
 		const [jev] = jevCalls(calls);
 		expect(jev?.method).toBe("POST");
 		expect(jev?.url.href).toBe("https://api.typesafe.ai/v1/systemone");
-		expect(jev?.headers.get("Authorization")).toBe(
-			`Bearer ${env.SIGW_TYPESAFE_KEY}`,
-		);
+		expect(jev?.headers.get("Authorization")).toBe(`Bearer ${TEST_SIGW_KEY}`);
 		expect(jev?.headers.get("x-sigw-user")).toBe(user.id);
 		expect(jev?.body).toEqual({
 			model: "jev-latest",

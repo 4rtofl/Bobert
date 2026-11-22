@@ -199,7 +199,7 @@ export class AgentSession extends DurableObject<Env> {
 				return "already";
 			}
 			this.stopStreaming();
-			const client = this.client(state);
+			const client = await this.client(state);
 			if (client !== null) {
 				try {
 					await deleteSession(client, state.sessionId);
@@ -280,7 +280,7 @@ export class AgentSession extends DurableObject<Env> {
 	 * (止まった知らせを受け取り損ねたときに、流れを閉じるため)
 	 */
 	private async settleIfIdle(state: SessionState): Promise<void> {
-		const client = this.client(state);
+		const client = await this.client(state);
 		if (client === null || state.sessionId === null) {
 			return;
 		}
@@ -304,7 +304,7 @@ export class AgentSession extends DurableObject<Env> {
 			}
 			this.stopStreaming();
 			if (state.sessionId !== null) {
-				const client = this.client(state);
+				const client = await this.client(state);
 				if (client !== null) {
 					await deleteSession(client, state.sessionId).catch(
 						(error: unknown) => {
@@ -361,7 +361,7 @@ export class AgentSession extends DurableObject<Env> {
 			if (state === null || state.sessionId === null || !state.working) {
 				return;
 			}
-			const client = this.client(state);
+			const client = await this.client(state);
 			if (client === null) {
 				return;
 			}
@@ -521,8 +521,8 @@ export class AgentSession extends DurableObject<Env> {
 	 * sigw経由のクライアント。費用は、チャンネルの持ち主(セッションを始めた人)にかかる。
 	 * Bobertにsigwのキーがなければnull
 	 */
-	private client(state: SessionState): Anthropic | null {
-		return agentsAvailable(this.env)
+	private async client(state: SessionState): Promise<Anthropic | null> {
+		return (await agentsAvailable(this.env))
 			? agentClient(this.env, state.ownerId)
 			: null;
 	}

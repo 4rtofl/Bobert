@@ -23,15 +23,11 @@
 			// エージェントのGitHubとの連携に使う、Bobert用のGitHub App(docs/setup.md「GitHub App」)
 			"GITHUB_APP_CLIENT_ID",
 			"GITHUB_APP_CLIENT_SECRET",
-			"GITHUB_APP_SLUG",
-			// AIの呼び出しに使う、Bobert用のsigwのキー(docs/setup.md「sigw」)。空にしたプロバイダのモデルは使えない
-			"SIGW_ANTHROPIC_KEY",
-			"SIGW_OPENROUTER_KEY",
-			// Jevの呼び出しに使う、Bobert用のsigwのキー。空なら、Jevは使えない
-			"SIGW_TYPESAFE_KEY"
+			"GITHUB_APP_SLUG"
 		]
 	},
-	// AIの呼び出しを中継するsigw(4rtofl/si-gateway)のWorker。Service Bindingで、Bobert用の入口を呼ぶ
+	// AIの呼び出しを中継するsigw(4rtofl/si-gateway)のWorker。Service Bindingで、Bobert用の入口を呼ぶ。
+	// 呼び出しに使うsigwのキーは、シークレットではなく、デプロイの後に /sigw で登録する(D1に暗号化して保存する)
 	// (仕様: docs/spec/llm-cost.md「AIの呼び出しと費用の負担」)
 	"services": [
 		{ "binding": "SIGW", "service": "sigw", "entrypoint": "BobertGateway" }
@@ -131,10 +127,7 @@
 					"CREDENTIAL_ENCRYPTION_KEYS",
 					"GITHUB_APP_CLIENT_ID",
 					"GITHUB_APP_CLIENT_SECRET",
-					"GITHUB_APP_SLUG",
-					"SIGW_ANTHROPIC_KEY",
-					"SIGW_OPENROUTER_KEY",
-					"SIGW_TYPESAFE_KEY"
+					"GITHUB_APP_SLUG"
 				]
 			},
 			"services": [

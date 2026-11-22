@@ -98,7 +98,7 @@ export class VideoJob extends DurableObject<Env> {
 			if (state === null) {
 				return;
 			}
-			if (agentsAvailable(this.env)) {
+			if (await agentsAvailable(this.env)) {
 				await this.cleanUp(agentClient(this.env, state.userId), state);
 			}
 			await this.clear(state);
@@ -111,7 +111,7 @@ export class VideoJob extends DurableObject<Env> {
 			if (state === null) {
 				return;
 			}
-			if (!agentsAvailable(this.env)) {
+			if (!(await agentsAvailable(this.env))) {
 				// Bobertからsigwのキーが外された。セッションを操作できないので、知らせて、記録だけを消す
 				this.log("sigw_key_missing", state);
 				await this.notify(state, AI_UNAVAILABLE_TEXT).catch(

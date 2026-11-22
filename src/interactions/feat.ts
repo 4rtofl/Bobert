@@ -75,7 +75,7 @@ export async function toggleFeature(
 	if (
 		enabled &&
 		"needsAgents" in feature &&
-		!sigwProviders(env).has("anthropic")
+		!(await sigwProviders(env)).has("anthropic")
 	) {
 		logEvent("interactions", "feature_unavailable", {
 			userId,

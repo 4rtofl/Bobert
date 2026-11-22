@@ -104,7 +104,7 @@ export async function handleMemoryJob(
 		await showScreen(env, job);
 		return;
 	}
-	const model = userModel(env, userId, MEMORY_MODEL_KEY);
+	const model = await userModel(env, userId, MEMORY_MODEL_KEY);
 	if (model === null) {
 		await recordMemoryFailure(env.DB, userId, guildId, MEMORY_KEY_REQUIRED);
 		log("skipped", { userId, reason: "no_key" });

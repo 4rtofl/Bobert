@@ -263,7 +263,7 @@ export async function withReplyModel<T>(
 ): Promise<T> {
 	const { userId } = requester;
 	const settings = await getUserSettings(env.DB, userId);
-	const resolution = resolveReplyModel(env, settings);
+	const resolution = await resolveReplyModel(env, settings);
 	if (!resolution.ok) {
 		log("setup_required", { userId, missing: resolution.missing });
 		return notAnswer(resolution.guidance);
@@ -507,7 +507,7 @@ export async function answer(
 		guildId !== null &&
 		videoTrigger !== undefined &&
 		settings.featVideo &&
-		sigwProviders(env).has("anthropic")
+		(await sigwProviders(env)).has("anthropic")
 			? {
 					requester: { userId, guildId, trigger: videoTrigger },
 					material: newVideoMaterial(),

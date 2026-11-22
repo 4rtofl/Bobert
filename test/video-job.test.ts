@@ -10,6 +10,7 @@ import {
 } from "../src/video/store";
 import { BOT, CHANNEL_ID, discordMessage } from "./fixtures";
 import { type FetchCall, mockFetch, userFactory } from "./helpers";
+import { TEST_SIGW_KEY } from "./sigw";
 
 const newUser = userFactory(63000);
 const GUILD_ID = "900";
@@ -230,7 +231,7 @@ describe("動画の仕事のDurable Object", () => {
 		);
 		expect(managed.length).toBeGreaterThan(0);
 		for (const call of managed) {
-			expect(call.headers.get("x-api-key")).toBe("sgk-anthropic-test");
+			expect(call.headers.get("x-api-key")).toBe(TEST_SIGW_KEY);
 			expect(call.headers.get("x-sigw-user")).toBe(owner.id);
 		}
 	});

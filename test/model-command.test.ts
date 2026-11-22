@@ -22,6 +22,7 @@ import {
 	sendInteraction,
 	userFactory,
 } from "./helpers";
+import { TEST_SIGW_KEY } from "./sigw";
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -363,7 +364,7 @@ describe("/model の「その他」", () => {
 		);
 		expect(check?.method).toBe("GET");
 		expect(check?.url.pathname).toBe("/v1/models/claude-sonnet-4-6");
-		expect(check?.headers.get("x-api-key")).toBe("sgk-anthropic-test");
+		expect(check?.headers.get("x-api-key")).toBe(TEST_SIGW_KEY);
 		expect(check?.headers.get("x-sigw-user")).toBe(user.id);
 		expect(calls.some((call) => call.url.hostname === "openrouter.ai")).toBe(
 			false,

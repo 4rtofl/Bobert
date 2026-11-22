@@ -191,7 +191,7 @@ async function precheck(
 	guildId: string,
 	context: StartContext,
 ): Promise<{ reply: MessageEdit } | null> {
-	if (!agentsAvailable(env)) {
+	if (!(await agentsAvailable(env))) {
 		return { reply: { content: AI_UNAVAILABLE_TEXT, components: [] } };
 	}
 	const active = await activeAgentChannels(env.DB, guildId, userId);
