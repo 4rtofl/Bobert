@@ -19,6 +19,7 @@ import {
 } from "../discord/constants";
 import { checkAnthropicModel } from "../llm/anthropic";
 import { findOpenRouterModel } from "../llm/model-info";
+import { sigwProviders } from "../llm/sigw";
 import { describeError, type ModelCheckResult } from "../llm/types";
 import { logEvent } from "../log";
 import { availableEfforts, openRouterEfforts } from "../respond/effort";
@@ -29,11 +30,9 @@ import {
 	resolveModel,
 	selectedCandidate,
 } from "../respond/model";
-import { invalidKeyMessage, setupGuidance } from "../respond/replies";
+import { modelUnavailableText } from "../respond/replies";
 import {
-	getRegisteredProviders,
 	getUserSettings,
-	loadCredential,
 	type Provider,
 	type UserSettings,
 	updateUserSettings,
@@ -58,10 +57,8 @@ export async function modelCommand(
 	env: Env,
 	userId: string,
 ): Promise<APIInteractionResponse> {
-	const [providers, settings] = await Promise.all([
-		getRegisteredProviders(env.DB, userId),
-		getUserSettings(env.DB, userId),
-	]);
+	const providers = sigwProviders(env);
+	const settings = await getUserSettings(env.DB, userId);
 	return {
 		type: InteractionResponseType.ChannelMessageWithSource,
 		data: { flags: MessageFlags.Ephemeral, ...modelMenu(settings, providers) },
@@ -117,7 +114,7 @@ export function submitCustomModel(
 	);
 }
 
-/** メニューを出すメッセージの中身。資格情報を登録していなければ、メニューの代わりに登録を案内する */
+/** メニューを出すメッセージの中身。Bobertにsigwのキーがなければ、メニューの代わりに、呼び出せないことを知らせる */
 function modelMenu(
 	settings: UserSettings,
 	providers: ReadonlySet<Provider>,
@@ -127,7 +124,7 @@ function modelMenu(
 } {
 	const resolution = resolveModel(settings, providers);
 	if (!resolution.ok && resolution.missing === "credentials") {
-		return { content: setupGuidance(resolution), components: [] };
+		return { content: modelUnavailableText(resolution), components: [] };
 	}
 	// 「その他」のモデルを使っているときは、どれも選んでいない状態で出す。
 	// 選んだ状態の選択肢をもう一度選んでも、Discordは知らせてこないため
@@ -215,10 +212,8 @@ async function applyCandidate(
 	userId: string,
 	value: string,
 ): Promise<MessageEdit> {
-	const [providers, settings] = await Promise.all([
-		getRegisteredProviders(env.DB, userId),
-		getUserSettings(env.DB, userId),
-	]);
+	const providers = sigwProviders(env);
+	const settings = await getUserSettings(env.DB, userId);
 	const candidate = findModelCandidate(value);
 	if (!candidate) {
 		// メニューを出した後に、候補の一覧が変わった。今の候補で出し直す
@@ -228,8 +223,8 @@ async function applyCandidate(
 	const next = { ...settings, modelKey: candidate.key };
 	const resolution = resolveModel(next, providers);
 	if (!resolution.ok) {
-		// メニューを出した後に、資格情報が消された
-		return textOnly(setupGuidance(resolution));
+		// メニューを出した後に、Bobertのsigwのキーが外された
+		return textOnly(modelUnavailableText(resolution));
 	}
 	const resetEffort = await unsupportedEffort(
 		env,
@@ -291,12 +286,13 @@ async function verifyAndSaveCustomModel(
 		return notFound;
 	}
 	const provider = customModelProvider(modelId);
-	const [providers, settings] = await Promise.all([
-		getRegisteredProviders(env.DB, userId),
-		getUserSettings(env.DB, userId),
-	]);
-	if (!providers.has(provider)) {
-		return setupGuidance({ ok: false, missing: provider, label: modelId });
+	const settings = await getUserSettings(env.DB, userId);
+	if (!sigwProviders(env).has(provider)) {
+		return modelUnavailableText({
+			ok: false,
+			missing: provider,
+			label: modelId,
+		});
 	}
 
 	const check = await checkCustomModel(env, userId, provider, modelId);
@@ -324,8 +320,9 @@ async function verifyAndSaveCustomModel(
 			log("custom_model_not_found", { userId, provider });
 			return notFound;
 		case "invalid_key":
+			// sigwに断られた(Bobertのsigwのキーが無効など)。本人には直せないので、確かめられなかったことにする
 			log("custom_model_invalid_key", { userId, provider });
-			return invalidKeyMessage(provider);
+			return CHECK_UNAVAILABLE;
 		case "unavailable":
 			log("custom_model_check_unavailable", {
 				userId,
@@ -336,7 +333,7 @@ async function verifyAndSaveCustomModel(
 	}
 }
 
-/** Claudeは本人のキーでAnthropicに、それ以外はOpenRouterのモデル一覧で確かめる */
+/** Claudeはsigw経由でAnthropicに、それ以外はOpenRouterのモデル一覧で確かめる */
 async function checkCustomModel(
 	env: Env,
 	userId: string,
@@ -344,10 +341,7 @@ async function checkCustomModel(
 	modelId: string,
 ): Promise<ModelCheckResult> {
 	if (provider === "anthropic") {
-		const credential = await loadCredential(env, userId, "anthropic");
-		return credential === null
-			? { status: "invalid_key" }
-			: checkAnthropicModel(credential, modelId);
+		return checkAnthropicModel({ env, userId }, modelId);
 	}
 	try {
 		const info = await findOpenRouterModel(modelId);

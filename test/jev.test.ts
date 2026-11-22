@@ -52,6 +52,8 @@ import {
 	type FetchCall,
 	guildInteraction,
 	mockFetch,
+	noSigwEnv,
+	openRouterOnlyEnv,
 	sendInteraction,
 } from "./helpers";
 
@@ -345,19 +347,19 @@ describe("右クリックメニューの「Jevに聞く」", () => {
 		expect(sent).toEqual([]);
 	});
 
-	it("AIのキーを登録していなければ、AIのキーの登録方法を本人にだけ見せる", async () => {
+	it("Bobertにsigwのキーがなければ、AIを呼び出せないことを本人にだけ見せる", async () => {
 		const { environment, sent } = fakeQueues();
 		const user = await registered("65003", [], true);
 		const target = discordMessage("65102", ALICE, "おはよう");
 
 		const body = await sendInteraction(
 			menuInteraction(user, target),
-			environment,
+			noSigwEnv(environment),
 		);
 
 		expect(body.type).toBe(4);
 		expect(body.data.flags).toBe(64);
-		expect(body.data.content).toContain("AIのキーの登録が必要です");
+		expect(body.data.content).toContain("Bobertの管理者");
 		expect(sent).toEqual([]);
 	});
 });
@@ -799,7 +801,10 @@ describe("「Jevに聞く」の仕事", () => {
 			jev: () => jevAnswered({ q1: { type: "noul", noul: 0.6 } }),
 		});
 
-		await handleJevJob(jevJob(user, target, "65201"), environment);
+		await handleJevJob(
+			jevJob(user, target, "65201"),
+			openRouterOnlyEnv(environment),
+		);
 
 		expect(
 			calls.filter((call) => call.url.hostname === "openrouter.ai"),

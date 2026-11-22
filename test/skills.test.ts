@@ -37,7 +37,13 @@ import {
 } from "../src/store/skills";
 import { saveCredential, updateUserSettings } from "../src/store/users";
 import { ALICE, BOT, CHANNEL_ID, discordMessage } from "./fixtures";
-import { anthropicStreamOf, type FetchCall, mockFetch } from "./helpers";
+import {
+	anthropicStreamOf,
+	type FetchCall,
+	mockFetch,
+	openRouterOnlyEnv,
+	TEST_CALLER,
+} from "./helpers";
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -751,7 +757,7 @@ describe("道具の呼び出しの上限", () => {
 				: openRouterChat("答え");
 		});
 
-		const result = await chatWithOpenRouter("sk-or-test", request);
+		const result = await chatWithOpenRouter(TEST_CALLER, request);
 
 		const bodies = calls.map(
 			(call) =>
@@ -890,7 +896,10 @@ describe("返答でスキルを使う", () => {
 				: openRouterChat("まとめました。"),
 		);
 
-		await handleRespondJob(respondJob(trigger, guildId), testEnv);
+		await handleRespondJob(
+			respondJob(trigger, guildId),
+			openRouterOnlyEnv(testEnv),
+		);
 
 		const [first, second] = chatRequests(calls);
 		expect(first?.messages[0]).toEqual({
@@ -994,7 +1003,10 @@ describe("返答でスキルを使う", () => {
 		const trigger = mention(user, "こんにちは");
 		const calls = mockApis(trigger, () => openRouterChat("こんにちは!"));
 
-		await handleRespondJob(respondJob(trigger, guildId), testEnv);
+		await handleRespondJob(
+			respondJob(trigger, guildId),
+			openRouterOnlyEnv(testEnv),
+		);
 
 		const [request] = chatRequests(calls);
 		expect(request?.messages[0]).toEqual({
@@ -1011,7 +1023,10 @@ describe("返答でスキルを使う", () => {
 		const trigger = mention(user, "こんにちは");
 		const calls = mockApis(trigger, () => openRouterChat("こんにちは!"));
 
-		await handleRespondJob(respondJob(trigger, newGuild()), testEnv);
+		await handleRespondJob(
+			respondJob(trigger, newGuild()),
+			openRouterOnlyEnv(testEnv),
+		);
 
 		const [request] = chatRequests(calls);
 		expect(request?.messages[0]).toEqual({
@@ -1048,7 +1063,10 @@ describe("返答でスキルを使う", () => {
 				: openRouterChat("まとめました。"),
 		);
 
-		await handleRespondJob(respondJob(trigger, guildId), testEnv);
+		await handleRespondJob(
+			respondJob(trigger, guildId),
+			openRouterOnlyEnv(testEnv),
+		);
 
 		const [request] = chatRequests(calls);
 		expect(request?.messages[0]?.content).toBe(COMMON_SYSTEM_PROMPT);

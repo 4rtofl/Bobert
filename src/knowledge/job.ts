@@ -1,6 +1,6 @@
 import { createMessage, DiscordApiError } from "../discord/api";
-import { type OwnKeyModel, ownKeyModel } from "../llm/own-key";
 import { LlmError, type LlmErrorKind } from "../llm/types";
+import { type UserModel, userModel } from "../llm/user-model";
 import { logEvent } from "../log";
 import type { KnowledgeJob, KnowledgeProgress } from "../queue/messages";
 import { attachmentKey } from "../respond/attachments";
@@ -63,7 +63,7 @@ import {
 
 /**
  * 知識チャンネルに送られたファイルを、文字にして要約する仕事(仕様: docs/spec/architecture.md「知識チャンネル」)。
- * 送った人のキーを確かめ、大きさを確かめてから、文字にして保存し、送った人のキーで要約する。
+ * 送った人の費用で要約できるかを確かめ、大きさを確かめてから、文字にして保存し、送った人の費用でsigw経由で要約する。
  * 知識に入ったら、中を探せるよう、文字にした内容を区切ってベクトルにする。
  * 受け付けないときと、文字にできないとき、要約できないときは、知識に加えず、ファイルのメッセージへの返信で知らせる。
  * 受け付けたときに見せ始めた進み具合(👀と返信)は、中身を読み取ったときと、読み込みが終わったときに見せ直す
@@ -96,8 +96,8 @@ export interface KnowledgeJobDeps extends ConversionDeps, KnowledgeStorage {
 	history: Pick<HistoryDeps, "fetchMessage" | "ingest" | "guildId">;
 	/** ファイルを、DiscordのCDNから読む */
 	download: (url: string) => Promise<Download>;
-	/** 送った人のキーで呼ぶ、要約のモデル。呼べるキーがなければnull */
-	summaryModel: (userId: string) => Promise<OwnKeyModel | null>;
+	/** 送った人の費用で呼ぶ、要約のモデル。呼べなければ(Bobertにsigwのキーがない)null */
+	summaryModel: (userId: string) => Promise<UserModel | null>;
 	/** ファイルのメッセージに、返信で知らせる。送れなくても、例外にはしない */
 	reply: (
 		channelId: string,
@@ -144,7 +144,7 @@ export async function handleKnowledgeJob(
 	);
 }
 
-/** 本物のD1、Workers AI、DiscordのAPI、送った人のキーを使う。progressは、進み具合を見せている、ファイルのメッセージと返信 */
+/** 本物のD1、Workers AI、DiscordのAPI、sigwを使う。progressは、進み具合を見せている、ファイルのメッセージと返信 */
 export function knowledgeJobDeps(
 	env: Env,
 	file: Pick<KnowledgeFile, "guildId" | "channelId">,
@@ -163,8 +163,8 @@ export function knowledgeJobDeps(
 			knownNames: [],
 		}),
 		download: downloadKnowledgeFile,
-		summaryModel: (userId) =>
-			ownKeyModel(env, userId, KNOWLEDGE_SUMMARY_MODEL_KEY),
+		summaryModel: async (userId) =>
+			userModel(env, userId, KNOWLEDGE_SUMMARY_MODEL_KEY),
 		reply: (channelId, messageId, content) =>
 			replyToFile(env.DISCORD_BOT_TOKEN, channelId, messageId, content),
 		showProgress: () => showProgress(env, progress),
@@ -233,7 +233,7 @@ async function addToKnowledge(
 		log("rejected", { ...fileDetail(file), reason, attempts, ...detail });
 	};
 	try {
-		// 要約の費用は送った人のキーにかけるので、キーがなければ受け付けない(寄付は使わない)。
+		// 要約の費用は送った人にかける(寄付は使わない)。要約のモデルを呼べなければ(Bobertにsigwのキーがない)、受け付けない。
 		// 同じメッセージのほかのファイルも、まとめて受け付けないことにして、知らせるのは1回だけにする
 		const model = await deps.summaryModel(file.authorId);
 		if (model === null) {
@@ -382,14 +382,14 @@ async function embedFile(
 }
 
 /**
- * 文字にした内容の先頭を、送った人のキーで要約し、知識に入れる。
+ * 文字にした内容の先頭を、送った人の費用で要約し、知識に入れる。
  * キーが無効、残高不足、AIに断られたなどで要約できなければ、知識に加えず、メンションへの返答のエラーと同じ文で知らせる。
  * レート制限などのやり直せば通るかもしれない失敗は、例外のままにする(Queueでやり直す)
  */
 async function summarize(
 	file: KnowledgeFile,
 	deps: KnowledgeJobDeps,
-	model: OwnKeyModel,
+	model: UserModel,
 	context: {
 		label: string | null;
 		textLength: number;
@@ -410,7 +410,7 @@ async function summarize(
 		MAX_SUMMARY_INPUT_CHARS,
 	);
 	const head = summaryHead(loaded.text);
-	let result: Awaited<ReturnType<OwnKeyModel["call"]>>;
+	let result: Awaited<ReturnType<UserModel["call"]>>;
 	try {
 		result = await model.call(
 			summaryRequest(model.resolved.modelId, file.filename, head, textLength),

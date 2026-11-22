@@ -8,13 +8,17 @@ import {
 	LlmError,
 	type ToolResult,
 } from "../src/llm/types";
-import { anthropicStreamOf, type FetchCall, mockFetch } from "./helpers";
+import {
+	anthropicStreamOf,
+	type FetchCall,
+	mockFetch,
+	TEST_CALLER,
+} from "./helpers";
 
 afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-const CREDENTIAL = { apiKey: "sk-ant-test", workspaceId: null };
 const IMAGE_URL =
 	"https://cdn.discordapp.com/attachments/800/9001/photo.png?ex=1";
 const PDF_URL =
@@ -144,7 +148,7 @@ describe("道具の結果のファイル(Anthropic)", () => {
 		const calls = toolThenAnswer();
 
 		const result = await chatWithAnthropic(
-			CREDENTIAL,
+			TEST_CALLER,
 			request("claude-haiku-5-5", [fileTool()]),
 		);
 
@@ -173,7 +177,7 @@ describe("道具の結果のファイル(Anthropic)", () => {
 		const calls = toolThenAnswer();
 
 		await chatWithAnthropic(
-			CREDENTIAL,
+			TEST_CALLER,
 			request("claude-haiku-5-5", [fileTool(INLINE_PDF_RESULT)]),
 		);
 
@@ -195,7 +199,7 @@ describe("道具の結果のファイル(Anthropic)", () => {
 		const calls = toolThenAnswer(anthropicRejected);
 
 		const result = await chatWithAnthropic(
-			CREDENTIAL,
+			TEST_CALLER,
 			request("claude-haiku-5-5", [fileTool()]),
 		);
 
@@ -222,7 +226,7 @@ describe("道具の結果のファイル(Anthropic)", () => {
 		toolThenAnswer(anthropicRejected, anthropicRejected);
 
 		await expect(
-			chatWithAnthropic(CREDENTIAL, request("claude-haiku-5-5", [fileTool()])),
+			chatWithAnthropic(TEST_CALLER, request("claude-haiku-5-5", [fileTool()])),
 		).rejects.toMatchObject({ kind: "bad_request" });
 	});
 
@@ -230,7 +234,7 @@ describe("道具の結果のファイル(Anthropic)", () => {
 		const calls = mockFetch(() => anthropicRejected());
 
 		await expect(
-			chatWithAnthropic(CREDENTIAL, request("claude-haiku-5-5", [fileTool()])),
+			chatWithAnthropic(TEST_CALLER, request("claude-haiku-5-5", [fileTool()])),
 		).rejects.toBeInstanceOf(LlmError);
 		expect(calls).toHaveLength(1);
 	});
@@ -246,7 +250,7 @@ describe("道具の結果のファイル(OpenRouter)", () => {
 		);
 
 		const result = await chatWithOpenRouter(
-			"sk-or-test",
+			TEST_CALLER,
 			request("openai/gpt-6-luna", [fileTool()]),
 		);
 
@@ -287,7 +291,7 @@ describe("道具の結果のファイル(OpenRouter)", () => {
 		);
 
 		await chatWithOpenRouter(
-			"sk-or-test",
+			TEST_CALLER,
 			request("openai/gpt-6-luna", [fileTool(INLINE_PDF_RESULT)]),
 		);
 
@@ -316,7 +320,7 @@ describe("道具の結果のファイル(OpenRouter)", () => {
 		});
 
 		const result = await chatWithOpenRouter(
-			"sk-or-test",
+			TEST_CALLER,
 			request("openai/gpt-6-luna", [fileTool()]),
 		);
 

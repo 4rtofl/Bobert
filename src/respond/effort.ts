@@ -6,7 +6,7 @@ import {
 	type OpenRouterModelInfo,
 } from "../llm/model-info";
 import { logEvent } from "../log";
-import { loadCredential, type UserSettings } from "../store/users";
+import type { UserSettings } from "../store/users";
 import { type ResolvedModel, selectedCandidate } from "./model";
 
 /** 思考の深さの並び(浅い順)。段階を並べるときと、いちばん近い段階を選ぶときに使う */
@@ -24,7 +24,7 @@ const EFFORT_ORDER = [
  * 本人が使うモデルで選べる思考の深さ(浅い順)。空なら選べない。モデル情報を取得できなければ、例外を投げる
  * (仕様: docs/spec/llm-cost.md「/effortの選択肢」)。
  * - Claudeの候補は low〜max
- * - 「その他」で入力したClaudeは、本人のキーで、Anthropicのモデル情報から作る
+ * - 「その他」で入力したClaudeは、sigw経由で、Anthropicのモデル情報から作る
  * - ほかのモデルは、OpenRouterのモデル情報から作る
  */
 export async function availableEfforts(
@@ -37,11 +37,7 @@ export async function availableEfforts(
 		return [...CLAUDE_EFFORTS];
 	}
 	if (model.provider === "anthropic") {
-		const credential = await loadCredential(env, userId, "anthropic");
-		if (credential === null) {
-			throw new Error("Anthropic credential is missing");
-		}
-		return (await findClaudeModel(credential, model.modelId)).efforts;
+		return (await findClaudeModel({ env, userId }, model.modelId)).efforts;
 	}
 	const info = await findOpenRouterModel(model.modelId);
 	return info === null ? [] : openRouterEfforts(info);

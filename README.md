@@ -1,6 +1,6 @@
 # Bobert
 
-Discord上でAIと会話できるBot。Botへのメンションや返信で話しかけると、AIが答える。LLMの費用は、各ユーザーが自分のキー(AnthropicのAPIキー、またはOpenRouter)で負担する。サーバーの全員が使えるクレジットを、寄付することもできる。
+Discord上でAIと会話できるBot。Botへのメンションや返信で話しかけると、AIが答える。AIの呼び出しはsigw([4rtofl/si-gateway](https://github.com/4rtofl/si-gateway))を通し、費用は返答を頼んだ人が負担する(sigwが毎月まとめて精算する)。
 
 ## 仕様
 

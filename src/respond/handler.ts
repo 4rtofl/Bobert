@@ -14,6 +14,7 @@ import { type KnowledgeReads, readKnowledgeFileTool } from "../knowledge/tool";
 import { chatWithAnthropic } from "../llm/anthropic";
 import { findOpenRouterModel } from "../llm/model-info";
 import { chatWithOpenRouter } from "../llm/openrouter";
+import type { SigwCaller } from "../llm/sigw";
 import {
 	type ChatRequest,
 	type ChatResult,
@@ -42,7 +43,6 @@ import {
 	recordReplyUsage,
 } from "../store/summaries";
 import {
-	type Credential,
 	getRegisteredProviders,
 	getUserSettings,
 	type UserSettings,
@@ -254,8 +254,8 @@ export interface ReplyModel {
 	userId: string;
 	settings: UserSettings;
 	model: ResolvedModel;
-	/** 費用を払う人のキー(寄付で答えるときは、寄付した人のキー) */
-	credential: Credential;
+	/** sigw経由でAIを呼ぶ人。費用を払う人(頼んだ本人)で、モデル情報の取得にも使う */
+	caller: SigwCaller;
 	/** 費用を払う人(本人か、サーバーに寄付した人) */
 	payer: Payer;
 	/** 設定していなければ既定の段階、モデルが選べなければいちばん近い段階 */
@@ -266,8 +266,8 @@ export interface ReplyModel {
 
 /**
  * 本人の設定とモデルで、返答を作る(メンションへの返答、「Bobertに聞く」、要約で共通)。
- * サーバーに寄付があれば、寄付した人のキーで答える(仕様: docs/spec/llm-cost.md「クレジットの寄付」)。
- * キーを登録していなければ登録方法の案内を、AIの呼び出しに失敗したら理由を、notAnswerで返す。
+ * AIはsigw経由で呼び、費用は本人が払う(仕様: docs/spec/llm-cost.md「AIの呼び出しと費用の負担」)。
+ * モデルを呼べなければその理由を、AIの呼び出しに失敗したら理由を、notAnswerで返す。
  * 寄付した人のキーが無効か残高不足なら、その寄付を止めて、次の寄付か本人のキーで答え直す
  */
 export async function withReplyModel<T>(
@@ -297,7 +297,7 @@ export async function withReplyModel<T>(
 			userId,
 			settings,
 			model,
-			credential: paid.credential,
+			caller: { env, userId: paid.billedUserId },
 			payer,
 			effort: await replyEffort(env, userId, settings, model),
 			callModel: paidCall(env, paid, settings),
@@ -329,17 +329,18 @@ export async function withReplyModel<T>(
 	}
 }
 
-/** 費用を払う人のキーでAIを呼ぶ関数。寄付で答えるときは、呼ぶたびに、その分の費用を寄付から差し引く */
+/** 費用を払う人の分として、sigw経由でAIを呼ぶ関数。寄付で答えるときは、呼ぶたびに、その分の費用を寄付から差し引く */
 function paidCall(
 	env: Env,
-	{ payer, model, credential }: PaidModel,
+	{ payer, model, billedUserId }: PaidModel,
 	settings: UserSettings,
 ): (request: ChatRequest) => Promise<ChatResult> {
+	const caller = { env, userId: billedUserId };
 	return async (request) => {
 		const result =
 			model.provider === "anthropic"
-				? await chatWithAnthropic(credential, request)
-				: await chatWithOpenRouter(credential.apiKey, request);
+				? await chatWithAnthropic(caller, request)
+				: await chatWithOpenRouter(caller, request);
 		if (payer.kind === "donation") {
 			await chargeDonationFor(
 				env,
@@ -353,7 +354,7 @@ function paidCall(
 	};
 }
 
-/** AIの答えではない返答(登録方法の案内や、エラーの理由) */
+/** AIの答えではない返答(AIを呼び出せないことや、エラーの理由) */
 export function notAnswer(text: string): ComposedReply {
 	return { text, inputTokens: null, offerCompaction: false };
 }
@@ -392,7 +393,7 @@ async function composeAnswer(
 		size !== null &&
 		messages.length > KEEP_RECENT_MESSAGES &&
 		size >=
-			(await inputLimit(context.settings, context.model, context.credential)) *
+			(await inputLimit(context.settings, context.model, context.caller)) *
 				SUMMARY_THRESHOLD
 	) {
 		const result = await summarizeOlderPart({

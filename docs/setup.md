@@ -64,8 +64,16 @@
 3. 作った後の画面で「Client ID」を控え、「Generate a new client secret」でシークレットを作って控える(その画面でしか見られない)。アプリの公開ページのURL(`https://github.com/apps/〇〇`)の「〇〇」が、アプリのURL上の名前。App IDと秘密鍵(Private key)は使わない。
 4. 3つの値を、本番のシークレット(`.env.production`)に書く: `GITHUB_APP_CLIENT_ID`、`GITHUB_APP_CLIENT_SECRET`、`GITHUB_APP_SLUG`。デプロイのときに、`--secrets-file .env.production`で入れる(README「Cloudflareのリソースを作る」)。
 
+### sigw(AIの呼び出し)
+
+返答などのAIの呼び出しは、sigw([4rtofl/si-gateway](https://github.com/4rtofl/si-gateway))を通す(仕組みは[LLM利用コスト](spec/llm-cost.md)「AIの呼び出しと費用の負担」を参照)。
+1. sigwのWorker(`sigw`)が、Bobertと同じCloudflareのアカウントで動いていることを確かめる。Bobertは、Service Bindingで、その`BobertGateway`の入口を呼ぶ(`wrangler.jsonc`の`services`)。開発用の環境も、同じ`sigw`を呼ぶ。
+2. sigwで、Bobert用のsigwのキーを、Anthropic用とOpenRouter用に1つずつ発行する(`sgk_`で始まる)。個人トークンは要らない。誰の分かは、Bobertが呼び出しのたびに送る。
+3. 2つのキーを、シークレットに入れる: `SIGW_ANTHROPIC_KEY`、`SIGW_OPENROUTER_KEY`。本番は`.env.production`に書き、手元は`.env`に書く。片方を空にすると、そのプロバイダのモデルは使えない(AnthropicのキーがなければClaudeもOpenRouter経由で呼ぶ)。
+
 ### LLM(テスト用)
 
+エージェントと動画の作成は、まだ利用者が登録したAnthropicのキーで呼ぶ。そのテストに、下のキーを使う。
 - **Anthropic:** 開発者自身のClaude ConsoleのAPIキー。テストに使う分の費用は開発者が払う。利用者は各自のキーを使う。
 - **OpenRouter:** 開発者自身のアカウントと、少額のクレジット。OAuth連携のテストに使う。アプリの事前登録は不要で、コールバックURLを指定するだけでよい。
 
@@ -98,7 +106,7 @@
 ## 開発中の費用
 
 - **Cloudflare:** 月$5(有料プラン。開発用と本番用の両方を含む)。
-- **LLM:** テストで使った分(開発者自身のキー)。
+- **LLM:** テストで使った分。返答などは、開発者の分としてsigwが記録する。エージェントと動画の作成は、開発者自身のキー。
 
 ## 参考
 

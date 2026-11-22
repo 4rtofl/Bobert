@@ -1,3 +1,5 @@
+import { AI_UNAVAILABLE_TEXT } from "../llm/sigw";
+
 /**
  * 記憶の、表示する文言(仕様: docs/spec/behavior.md「記憶」。2026-11-01に承認。まとめている間の文と費用の注記は、2026-11-04に変更)
  */
@@ -36,9 +38,8 @@ export const MEMORY_CLEAR_LABEL = "全部消す";
 export const MEMORY_OFF_LABEL = "OFFにする";
 export const MEMORY_CLEAR_CONFIRM_LABEL = "消す";
 
-/** キーがない人が「ONにする」を押したとき(本人にだけ見える) */
-export const MEMORY_KEY_REQUIRED =
-	"記憶を使うには、AIのキーの登録が必要です。`/setup` から登録してください。";
+/** AIを呼び出せないとき(Bobertにsigwのキーがない)に「ONにする」を押したときと、まとめられなかったとき */
+export const MEMORY_KEY_REQUIRED = AI_UNAVAILABLE_TEXT;
 
 /** 「ONにする」を押した直後(まとめ終わったら、ONの画面に書き換える) */
 export const MEMORY_BUILDING = "記憶をまとめています...";

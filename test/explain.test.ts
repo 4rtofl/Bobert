@@ -30,6 +30,7 @@ import {
 	type FetchCall,
 	guildInteraction,
 	mockFetch,
+	noSigwEnv,
 	sendInteraction,
 } from "./helpers";
 
@@ -182,7 +183,7 @@ describe("右クリックメニューの「Bobertに聞く」", () => {
 		]);
 	});
 
-	it("キーを登録していなければ、登録方法を本人にだけ見せ、仕事は入れない", async () => {
+	it("Bobertにsigwのキーがなければ、AIを呼び出せないことを本人にだけ見せ、仕事は入れない", async () => {
 		const { environment, sent } = fakeQueues();
 		const target = discordMessage("8010", ALICE, "おはよう");
 
@@ -198,12 +199,12 @@ describe("右クリックメニューの「Bobertに聞く」", () => {
 				},
 				{ ...BOB, id: "181" },
 			),
-			environment,
+			noSigwEnv(environment),
 		);
 
 		expect(body.type).toBe(4);
 		expect(body.data.flags).toBe(64);
-		expect(body.data.content).toContain("`/setup`");
+		expect(body.data.content).toContain("Bobertの管理者");
 		expect(sent).toEqual([]);
 	});
 });

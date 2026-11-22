@@ -1,5 +1,5 @@
-import type { AnthropicCredential } from "../llm/anthropic";
 import { findClaudeModel, findOpenRouterModel } from "../llm/model-info";
+import type { SigwCaller } from "../llm/sigw";
 import type { ChatRequest, ChatResult, TokenUsage } from "../llm/types";
 import type { StoredMessageInput } from "../queue/messages";
 import {
@@ -67,12 +67,12 @@ export async function conversationSize(
 /**
  * 使うモデルの入力の上限(トークン)。モデル情報から取る。
  * 候補と、「その他」で入力したOpenRouterのモデルは、OpenRouterのモデル一覧から(Anthropicで直接呼ぶ候補も、同じモデルの情報を使う)。
- * 「その他」で入力したClaudeは、本人のキーで、Anthropicのモデル情報から。分からなければ、FALLBACK_INPUT_LIMIT
+ * 「その他」で入力したClaudeは、sigw経由で、Anthropicのモデル情報から。分からなければ、FALLBACK_INPUT_LIMIT
  */
 export async function inputLimit(
 	settings: UserSettings,
 	model: ResolvedModel,
-	credential: AnthropicCredential,
+	caller: SigwCaller,
 ): Promise<number> {
 	try {
 		const candidate = selectedCandidate(settings);
@@ -89,7 +89,7 @@ export async function inputLimit(
 			);
 		}
 		return (
-			(await findClaudeModel(credential, model.modelId)).maxInputTokens ??
+			(await findClaudeModel(caller, model.modelId)).maxInputTokens ??
 			FALLBACK_INPUT_LIMIT
 		);
 	} catch {
@@ -145,7 +145,7 @@ export interface SummarizeResult {
 }
 
 /**
- * 会話の古い部分を要約して保存する。新しい20件を残し、それより前(前の要約を含む)を、そのときのモデルと本人のキーで要約する。
+ * 会話の古い部分を要約して保存する。新しい20件を残し、それより前(前の要約を含む)を、そのときのモデルで、本人の費用で要約する。
  * messagesは、要約した位置より後の発言(古い順)。KEEP_RECENT_MESSAGESより多いときに呼ぶ。
  * 途中で打ち切られた要約は、大事なことが抜けているかもしれないので使わない
  */

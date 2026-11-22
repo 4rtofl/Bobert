@@ -513,7 +513,8 @@ describe("寄付の残り", () => {
 	});
 });
 
-describe("寄付で答える", () => {
+// 寄付は、いまは返答に使わない(費用は、頼んだ人がsigwを通して払う)。寄付の仕組みと一緒に、別に消す
+describe.skip("寄付で答える", () => {
 	it("キーのない人にも、寄付した人のキーで答え、費用を寄付から差し引いて、返答の末尾に書く", async () => {
 		const guildId = newId();
 		const donor = await withAnthropicKey("donor");

@@ -4,9 +4,11 @@
  *   Web検索を使えるかの判断、利用量の表示の費用(Anthropicで直接呼ぶClaude)に使う。
  *   一覧は大きい(数百件、約800KB)
  * - Anthropicのモデル情報: 「その他」で入力したClaudeで選べる思考の深さと、Web検索を使えるか、入力の上限に使う
- * 入力の上限は、長い会話の自動要約に使う
+ * 入力の上限は、長い会話の自動要約に使う。
+ * OpenRouterのモデル一覧は、キーなしで読めるので、sigwを通さずに直接取る。Anthropicのモデル情報は、sigw経由で取る
  */
-import { type AnthropicCredential, checkAnthropicModel } from "./anthropic";
+import { checkAnthropicModel } from "./anthropic";
+import type { SigwCaller } from "./sigw";
 
 const MODELS_URL = "https://openrouter.ai/api/v1/models";
 
@@ -104,18 +106,18 @@ export async function findOpenRouterModel(
 }
 
 /**
- * 「その他」で入力したClaudeのモデル情報。本人のキーで、Anthropicのモデル情報から取り出す。
- * 確かめられなければ、例外を投げる。
+ * 「その他」で入力したClaudeのモデル情報。sigw経由で、Anthropicのモデル情報から取り出す。
+ * モデル情報は全員で同じなので、モデルIDごとに使い回す。確かめられなければ、例外を投げる。
  */
 export async function findClaudeModel(
-	credential: AnthropicCredential,
+	caller: SigwCaller,
 	modelId: string,
 ): Promise<ClaudeModelInfo> {
 	const cached = claudeModelCache.get(modelId);
 	if (cached !== undefined && Date.now() < cached.expiresAt) {
 		return cached.info;
 	}
-	const check = await checkAnthropicModel(credential, modelId);
+	const check = await checkAnthropicModel(caller, modelId);
 	if (check.status !== "found") {
 		throw new Error(`Anthropic model check failed: ${check.status}`);
 	}

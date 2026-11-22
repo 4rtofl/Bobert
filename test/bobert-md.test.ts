@@ -28,6 +28,7 @@ import {
 	type FetchCall,
 	guildInteraction,
 	mockFetch,
+	openRouterOnlyEnv,
 	sendInteraction,
 } from "./helpers";
 
@@ -488,7 +489,10 @@ describe("返答でBobert.mdを使う", () => {
 		const trigger = mention(user, "こんにちは");
 		const calls = mockApis(trigger, () => openRouterChat("こんにちは!"));
 
-		await handleRespondJob(respondJob(trigger, guildId), testEnv);
+		await handleRespondJob(
+			respondJob(trigger, guildId),
+			openRouterOnlyEnv(testEnv),
+		);
 
 		expect(systemSent(calls)).toEqual({
 			role: "system",
@@ -540,7 +544,10 @@ describe("返答でBobert.mdを使う", () => {
 				: openRouterChat("こんにちは!"),
 		);
 
-		await handleRespondJob(respondJob(trigger, guildId), testEnv);
+		await handleRespondJob(
+			respondJob(trigger, guildId),
+			openRouterOnlyEnv(testEnv),
+		);
 
 		expect(systemSent(calls)).toEqual({
 			role: "system",
@@ -559,7 +566,10 @@ describe("返答でBobert.mdを使う", () => {
 			const trigger = mention(user, "こんにちは");
 			const calls = mockApis(trigger, () => openRouterChat("こんにちは!"));
 
-			await handleRespondJob(respondJob(trigger, guildId), testEnv);
+			await handleRespondJob(
+				respondJob(trigger, guildId),
+				openRouterOnlyEnv(testEnv),
+			);
 
 			expect(systemSent(calls)).toEqual({
 				role: "system",

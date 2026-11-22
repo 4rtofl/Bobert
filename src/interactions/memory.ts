@@ -10,6 +10,7 @@ import {
 	MessageFlags,
 	TextInputStyle,
 } from "../discord/constants";
+import { sigwProviders } from "../llm/sigw";
 import { logEvent } from "../log";
 import { totalLength } from "../memory/prompts";
 import {
@@ -47,7 +48,6 @@ import {
 	saveMemoryItems,
 	setMemoryEnabled,
 } from "../store/memory";
-import { getRegisteredProviders } from "../store/users";
 import { readTextInput } from "./input";
 
 /**
@@ -124,8 +124,8 @@ async function turnOn(
 	userId: string,
 	guildId: string,
 ): Promise<APIInteractionResponse> {
-	// まとめる費用は本人のキーにかけるので、キーが要る(寄付は使わない)
-	if ((await getRegisteredProviders(env.DB, userId)).size === 0) {
+	// まとめる費用は本人にかける(寄付は使わない)。Bobertにsigwのキーがなければ、まとめられない
+	if (sigwProviders(env).size === 0) {
 		return {
 			type: InteractionResponseType.ChannelMessageWithSource,
 			data: { flags: MessageFlags.Ephemeral, content: MEMORY_KEY_REQUIRED },

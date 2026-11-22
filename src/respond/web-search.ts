@@ -1,7 +1,7 @@
 import { findClaudeModel, findOpenRouterModel } from "../llm/model-info";
 import type { Source } from "../llm/types";
 import { logEvent } from "../log";
-import { loadCredential, type UserSettings } from "../store/users";
+import type { UserSettings } from "../store/users";
 import { type ResolvedModel, selectedCandidate } from "./model";
 
 /** 出典として書くページの数の上限 */
@@ -10,7 +10,7 @@ const MAX_SOURCES = 5;
 /**
  * 本人のモデルでWeb検索を使えるか(仕様: docs/spec/behavior.md「Web検索」)。
  * - Claudeの候補は使える
- * - 「その他」で入力したClaudeは、本人のキーで、Anthropicのモデル情報から確かめる
+ * - 「その他」で入力したClaudeは、sigw経由で、Anthropicのモデル情報から確かめる
  * - ほかのモデルは、OpenRouterのモデル情報で、道具を使えるかを確かめる(OpenRouterのWeb検索は、モデルが道具として呼ぶため)
  * 確かめられなかったときはnull。検索はしないが、「使えません」とも書かない。
  */
@@ -25,10 +25,7 @@ export async function webSearchAvailable(
 	}
 	try {
 		if (model.provider === "anthropic") {
-			const credential = await loadCredential(env, userId, "anthropic");
-			return credential === null
-				? null
-				: (await findClaudeModel(credential, model.modelId)).webSearch;
+			return (await findClaudeModel({ env, userId }, model.modelId)).webSearch;
 		}
 		return (await findOpenRouterModel(model.modelId))?.supportsTools ?? false;
 	} catch (error) {

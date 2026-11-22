@@ -1,3 +1,5 @@
+import { AI_UNAVAILABLE_TEXT } from "../llm/sigw";
+
 /**
  * 知識チャンネルについて、Discordに表示する文言と、AIに渡す文(仕様: docs/spec/behavior.md「知識チャンネル」)。
  * 表示する文言は、2026-11-06に承認されたもの(issue #96)。複数のファイルがあるメッセージへの返信の形と、
@@ -51,8 +53,8 @@ function notAdded(filename: string | null): string {
 		: `「${escapeMarkdown(filename)}」は知識に加えませんでした。`;
 }
 
-/** キーを登録していない(メッセージごとに1回だけ知らせる) */
-export const KNOWLEDGE_NO_KEY = `${notAdded(null)}知識チャンネルのファイルを知識に加えるには、AIのキーの登録が必要です。\`/setup\` から登録して、ファイルを送り直してください。`;
+/** 要約のモデルを呼べない(Bobertにsigwのキーがない。メッセージごとに1回だけ知らせる) */
+export const KNOWLEDGE_NO_KEY = `${notAdded(null)}${AI_UNAVAILABLE_TEXT}`;
 
 /** 大きすぎる(20MBを超える) */
 export function knowledgeTooLarge(filename: string | null): string {

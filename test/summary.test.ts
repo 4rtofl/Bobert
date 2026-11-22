@@ -23,7 +23,12 @@ import {
 	discordMessage,
 	discordReply,
 } from "./fixtures";
-import { anthropicStreamOf, type FetchCall, mockFetch } from "./helpers";
+import {
+	anthropicStreamOf,
+	type FetchCall,
+	mockFetch,
+	TEST_CALLER,
+} from "./helpers";
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -295,7 +300,6 @@ describe("会話の量", () => {
 });
 
 describe("モデルの入力の上限", () => {
-	const credential = { apiKey: "sk-ant-test", workspaceId: null };
 	const haiku: ResolvedModel = {
 		provider: "anthropic",
 		modelId: "claude-haiku-5-5",
@@ -311,7 +315,7 @@ describe("モデルの入力の上限", () => {
 			}),
 		);
 
-		expect(await inputLimit(DEFAULT_USER_SETTINGS, haiku, credential)).toBe(
+		expect(await inputLimit(DEFAULT_USER_SETTINGS, haiku, TEST_CALLER)).toBe(
 			1_000_000,
 		);
 	});
@@ -333,7 +337,7 @@ describe("モデルの入力の上限", () => {
 			await inputLimit(
 				{ ...DEFAULT_USER_SETTINGS, modelKey: "custom" },
 				{ ...haiku, modelId: "claude-sonnet-4-6", label: "claude-sonnet-4-6" },
-				credential,
+				TEST_CALLER,
 			),
 		).toBe(200_000);
 	});
@@ -341,7 +345,7 @@ describe("モデルの入力の上限", () => {
 	it("モデル情報を取得できなければ、決めておいた値を使う", async () => {
 		mockFetch(() => new Response(null, { status: 503 }));
 
-		expect(await inputLimit(DEFAULT_USER_SETTINGS, haiku, credential)).toBe(
+		expect(await inputLimit(DEFAULT_USER_SETTINGS, haiku, TEST_CALLER)).toBe(
 			FALLBACK_INPUT_LIMIT,
 		);
 	});
