@@ -25,8 +25,8 @@ afterEach(() => {
 	clearModelInfoCache();
 });
 
-/** 資格情報を登録した、新しいユーザー(テストごとに別の人にする) */
-const userWith = userFactory(500);
+/** 新しいユーザー(テストごとに別の人にする) */
+const newUser = userFactory(500);
 
 function effortCommand(user: APIUser) {
 	return guildInteraction(
@@ -67,7 +67,7 @@ function anthropicModel(id: string, effort: Record<string, unknown>) {
 
 describe("/effort", () => {
 	it("モデル情報を取得することがあるので、まず本人にだけ見える保留の応答を返す", async () => {
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		mockModelApis([]);
 
 		const body = await sendInteraction(effortCommand(user));
@@ -81,7 +81,7 @@ describe("/effort", () => {
 	it("Bobertにsigwのキーがなければ、AIを呼び出せないことを伝える", async () => {
 		const calls = mockModelApis([]);
 
-		await sendInteraction(effortCommand(await userWith()), noSigwEnv());
+		await sendInteraction(effortCommand(await newUser()), noSigwEnv());
 
 		expect(editedMessage(calls)).toEqual({
 			content: expect.stringContaining("Bobertの管理者"),
@@ -90,7 +90,7 @@ describe("/effort", () => {
 	});
 
 	it("Claudeなら low〜max を出し、既定のlowに「(既定)」を付けて選んだ状態にする", async () => {
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const calls = mockModelApis([]);
 
 		await sendInteraction(effortCommand(user));
@@ -142,7 +142,7 @@ describe("/effort", () => {
 	});
 
 	it("OpenRouter経由のClaudeでも low〜max を出し、設定した段階を選んだ状態にする", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, { effort: "high" });
 		const calls = mockModelApis([]);
 
@@ -162,7 +162,7 @@ describe("/effort", () => {
 	});
 
 	it("Claude以外は、OpenRouterのモデル情報の段階を、浅い順に並べて出す", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, { modelKey: "qwen3.8-max" });
 		const calls = mockModelApis([
 			{
@@ -179,7 +179,7 @@ describe("/effort", () => {
 	});
 
 	it("lowを選べないモデルでは、代わりに使う段階に「(既定)」を付ける", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, { modelKey: "mistral-large-4" });
 		const calls = mockModelApis([
 			{ id: "mistralai/mistral-large-4-0", efforts: ["high", "none"] },
@@ -205,7 +205,7 @@ describe("/effort", () => {
 	});
 
 	it("思考の深さを選べないモデルなら、そう知らせる", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, { modelKey: "mimo-v2.6-pro" });
 		const calls = mockModelApis([{ id: "xiaomi/mimo-v2.6-pro" }]);
 
@@ -218,7 +218,7 @@ describe("/effort", () => {
 	});
 
 	it("モデル情報を取得できなければ、そう知らせる", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, { modelKey: "glm-5.3" });
 		const calls = mockFetch(({ url }) =>
 			url.hostname === "openrouter.ai"
@@ -236,7 +236,7 @@ describe("/effort", () => {
 	});
 
 	it("「その他」のClaudeは、sigw経由で、Anthropicのモデル情報から作る", async () => {
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, {
 			modelKey: "custom",
 			customModelId: "claude-sonnet-4-6",
@@ -267,7 +267,7 @@ describe("/effort", () => {
 
 describe("/effort のメニュー", () => {
 	it("選んだ段階を保存し、メニューのメッセージを結果に書き換える", async () => {
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const calls = mockModelApis([]);
 
 		const body = await sendInteraction(select(user, "high"));
@@ -283,7 +283,7 @@ describe("/effort のメニュー", () => {
 	});
 
 	it("既定の段階を選ぶと、設定を消して既定に従う", async () => {
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, { effort: "max" });
 		const calls = mockModelApis([]);
 
@@ -297,7 +297,7 @@ describe("/effort のメニュー", () => {
 
 	it("今のモデルで選べない段階なら保存せず、今のモデルのメニューを出し直す", async () => {
 		// メニューを出した後に、/model でモデルを変えた場合
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, { modelKey: "glm-5.3" });
 		const calls = mockModelApis([
 			{ id: "z-ai/glm-5.3", efforts: ["max", "high", "low"] },

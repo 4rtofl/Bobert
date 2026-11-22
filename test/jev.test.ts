@@ -21,11 +21,7 @@ import type {
 import { fromDiscord } from "../src/respond/history";
 import { handleJevJob } from "../src/respond/jev";
 import { RATE_LIMITED_TEXT } from "../src/respond/replies";
-import {
-	type Provider,
-	saveCredential,
-	updateUserSettings,
-} from "../src/store/users";
+import { updateUserSettings } from "../src/store/users";
 import {
 	ALICE,
 	at,
@@ -75,14 +71,8 @@ function fakeQueues() {
 	return { environment, sent };
 }
 
-/** キーを登録した人(このファイルのユーザーIDは65000番台) */
-async function registered(id: string, providers: Provider[]) {
-	for (const provider of providers) {
-		await saveCredential(env, id, provider, {
-			apiKey: `key-${provider}`,
-			workspaceId: null,
-		});
-	}
+/** Jevに聞く人(このファイルのユーザーIDは65000番台) */
+function userOf(id: string) {
 	return { ...BOB, id };
 }
 
@@ -288,7 +278,7 @@ describe("右クリックメニューの「Jevに聞く」", () => {
 
 	it("AIとJevを呼び出せれば、チャンネルに見える保留の応答を返し、仕事を入れる", async () => {
 		const { environment, sent } = fakeQueues();
-		const user = await registered("65001", ["anthropic"]);
+		const user = userOf("65001");
 		const target = discordMessage("65100", ALICE, "日本の首都は大阪だよね?");
 
 		const body = await sendInteraction(
@@ -316,7 +306,7 @@ describe("右クリックメニューの「Jevに聞く」", () => {
 
 	it("BobertにTypeSafe用のsigwのキーがなければ、呼び出せないことを本人にだけ見せ、仕事は入れない", async () => {
 		const { environment, sent } = fakeQueues();
-		const user = await registered("65002", ["anthropic"]);
+		const user = userOf("65002");
 		const target = discordMessage("65101", ALICE, "おはよう");
 
 		const body = await sendInteraction(
@@ -333,7 +323,7 @@ describe("右クリックメニューの「Jevに聞く」", () => {
 
 	it("Bobertにsigwのキーがなければ、AIを呼び出せないことを本人にだけ見せる", async () => {
 		const { environment, sent } = fakeQueues();
-		const user = await registered("65003", []);
+		const user = userOf("65003");
 		const target = discordMessage("65102", ALICE, "おはよう");
 
 		const body = await sendInteraction(
@@ -351,7 +341,7 @@ describe("右クリックメニューの「Jevに聞く」", () => {
 describe("「Jevに聞く」の仕事", () => {
 	it("AIが作った質問でJevに聞き、AIには結果を返さずに、Jevの回答を投稿する", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65010", ["anthropic"]);
+		const user = userOf("65010");
 		const target = discordMessage("65110", ALICE, "日本の首都は大阪だよね?");
 		const calls = mockApis([], {
 			ai: () => askJev(NOUL_INPUT),
@@ -436,7 +426,7 @@ describe("「Jevに聞く」の仕事", () => {
 
 	it("選択肢は確率の高い順に、段階は低い順に並べ、いちばん高いものを太字にする", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65011", ["anthropic"]);
+		const user = userOf("65011");
 		const target = discordMessage(
 			"65120",
 			ALICE,
@@ -543,7 +533,7 @@ describe("「Jevに聞く」の仕事", () => {
 
 	it("対象のメッセージが返信なら、返信先を読む道具も渡す", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65012", ["anthropic"]);
+		const user = userOf("65012");
 		const parent = discordMessage("65130", BOB, "明日の集まり、来る?");
 		const target = discordReply("65131", ALICE, "たぶん", parent);
 		const calls = mockApis([parent], {
@@ -572,7 +562,7 @@ describe("「Jevに聞く」の仕事", () => {
 
 	it("入力が正しくなければ、Jevを呼ばずに理由をAIに返し、直した入力で聞く", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65013", ["anthropic"]);
+		const user = userOf("65013");
 		const target = discordMessage("65140", ALICE, "どれがいい?");
 		let round = 0;
 		const calls = mockApis([], {
@@ -617,7 +607,7 @@ describe("「Jevに聞く」の仕事", () => {
 
 	it("Jevがリクエストを受け付けなければ、理由をAIに返して直してもらう", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65014", ["anthropic"]);
+		const user = userOf("65014");
 		const target = discordMessage("65150", ALICE, "本当?");
 		let round = 0;
 		const calls = mockApis([], {
@@ -667,7 +657,7 @@ describe("「Jevに聞く」の仕事", () => {
 		"Jevの呼び出しが「$status」で失敗したら、AIに続きを頼まずに理由を投稿する",
 		async ({ status, text, userId }) => {
 			const { environment } = fakeQueues();
-			const user = await registered(userId, ["anthropic"]);
+			const user = userOf(userId);
 			const target = discordMessage("65160", ALICE, "本当?");
 			const calls = mockApis([], {
 				ai: () => askJev(NOUL_INPUT),
@@ -683,7 +673,7 @@ describe("「Jevに聞く」の仕事", () => {
 
 	it("同じ回に2回呼ばれても、直せない失敗の後は、もうJevを呼ばない", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65024", ["anthropic"]);
+		const user = userOf("65024");
 		const target = discordMessage("65165", ALICE, "本当?");
 		const calls = mockApis([], {
 			ai: () =>
@@ -721,7 +711,7 @@ describe("「Jevに聞く」の仕事", () => {
 		"sigw自身が「$status」で断ったら、AIに直させずに、sigwの文を理由として投稿する",
 		async ({ status, userId }) => {
 			const { environment } = fakeQueues();
-			const user = await registered(userId, ["anthropic"]);
+			const user = userOf(userId);
 			const target = discordMessage("65167", ALICE, "本当?");
 			const sigwText = "[sigw] 今月の上限額に達しました";
 			const calls = mockApis([], {
@@ -739,7 +729,7 @@ describe("「Jevに聞く」の仕事", () => {
 
 	it("AIがJevに聞かずに終えたら、質問を作れなかったと投稿する", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65030", ["anthropic"]);
+		const user = userOf("65030");
 		const target = discordMessage("65170", ALICE, "おはよう");
 		const calls = mockApis([], {
 			ai: () => anthropicStreamOf([{ type: "text", text: "挨拶だね" }]),
@@ -753,7 +743,7 @@ describe("「Jevに聞く」の仕事", () => {
 
 	it("選んだ後にTypeSafe用のsigwのキーが外されていたら、AIを呼ばずに、呼び出せないことを投稿する", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65031", ["anthropic"]);
+		const user = userOf("65031");
 		const target = discordMessage("65180", ALICE, "本当?");
 		const calls = mockApis([], {
 			ai: () => askJev(NOUL_INPUT),
@@ -770,7 +760,7 @@ describe("「Jevに聞く」の仕事", () => {
 
 	it("同じ仕事は2回投稿しない", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65032", ["anthropic"]);
+		const user = userOf("65032");
 		const target = discordMessage("65190", ALICE, "本当?");
 		const job = jevJob(user, target, "65191");
 		const calls = mockApis([], {
@@ -787,7 +777,7 @@ describe("「Jevに聞く」の仕事", () => {
 
 	it("OpenRouterのモデルでも、Jevが答えたらAIとのやり取りを終える", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65033", ["openrouter"]);
+		const user = userOf("65033");
 		const target = discordMessage("65200", ALICE, "本当?");
 		const calls = mockApis([], {
 			ai: () =>
@@ -855,7 +845,7 @@ describe("/jev", () => {
 
 	it("AIとJevを呼び出せれば、チャンネルに見える保留の応答を返し、入力を対象のメッセージにした仕事を入れる", async () => {
 		const { environment, sent } = fakeQueues();
-		const user = await registered("65060", ["anthropic"]);
+		const user = userOf("65060");
 
 		const body = await sendInteraction(
 			commandInteraction(user, "  明日の集まりは雨で中止になりそう?  "),
@@ -899,7 +889,7 @@ describe("/jev", () => {
 
 	it("BobertにTypeSafe用のsigwのキーがなければ、呼び出せないことを本人にだけ見せ、仕事は入れない", async () => {
 		const { environment, sent } = fakeQueues();
-		const user = await registered("65061", ["anthropic"]);
+		const user = userOf("65061");
 
 		const body = await sendInteraction(
 			commandInteraction(user, "本当?"),
@@ -915,7 +905,7 @@ describe("/jev", () => {
 
 	it("入力された聞くことを対象のメッセージにして、右クリックメニューと同じ渡し方でJevに聞く", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65062", ["anthropic"]);
+		const user = userOf("65062");
 		const calls = mockApis([], {
 			ai: () => askJev(NOUL_INPUT),
 			jev: () => jevAnswered({ q1: { type: "noul", noul: 0.03 } }),
@@ -963,7 +953,7 @@ describe("/jev", () => {
 
 	it("使った後にTypeSafe用のsigwのキーが外されていたら、AIを呼ばずに、呼び出せないことを投稿する", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65063", ["anthropic"]);
+		const user = userOf("65063");
 		const calls = mockApis([], { ai: () => askJev(NOUL_INPUT) });
 
 		await handleJevJob(
@@ -977,7 +967,7 @@ describe("/jev", () => {
 
 	it("道具を使えないモデルでは、/jevを使えないと投稿する", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65064", ["openrouter"]);
+		const user = userOf("65064");
 		await updateUserSettings(env.DB, user.id, {
 			modelKey: "custom",
 			customModelId: "x-ai/old-model",
@@ -1003,7 +993,7 @@ describe("/jev", () => {
 describe("「Jevに聞く」の道具の入力", () => {
 	it("表示する文の改行は空白にし、Markdownの記号はそのまま表示する", async () => {
 		const { environment } = fakeQueues();
-		const user = await registered("65040", ["anthropic"]);
+		const user = userOf("65040");
 		const target = discordMessage("65210", ALICE, "本当?");
 		const calls = mockApis([], {
 			ai: () =>
@@ -1063,33 +1053,6 @@ describe("「Jevに聞く」の道具の入力", () => {
 });
 
 describe("TypeSafeのキーの登録をなくした後", () => {
-	it("/setupに、TypeSafeの行とボタンを出さない", async () => {
-		mockFetch(() => Response.json({}));
-		const body = await sendInteraction(
-			guildInteraction(
-				InteractionType.ApplicationCommand,
-				{ id: "10", name: "setup", type: 1 },
-				{ ...ALICE, id: "65050" },
-			),
-		);
-
-		expect(body.data.content).toBe(
-			[
-				"Bobertで使うプロバイダを登録します。",
-				"",
-				"- Anthropic: 未登録",
-				"- OpenRouter: 未連携",
-				"",
-				"-# OpenRouterとの連携のリンクは10分間有効です。",
-			].join("\n"),
-		);
-		expect(
-			body.data.components[0].components.map(
-				(button: { label: string }) => button.label,
-			),
-		).toEqual(["Anthropicのキーを登録", "OpenRouterと連携"]);
-	});
-
 	it("登録したTypeSafeのキーを保存していた表を消す", async () => {
 		const table = await env.DB.prepare(
 			"SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'typesafe_credentials'",

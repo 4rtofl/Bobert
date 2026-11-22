@@ -26,9 +26,6 @@ import {
 	type TokenUsage,
 } from "./types";
 
-/** OpenRouterのAPI。返答などはsigwを通すので、ここで直接呼ぶのは、OAuthでのキーの交換だけ */
-const OPENROUTER_API_BASE = "https://openrouter.ai/api/v1";
-
 /** OpenRouterのサイトでの、アプリの表示(任意のヘッダー) */
 const APP_HEADERS = {
 	"HTTP-Referer": "https://github.com/4rtoflow/Bobert",
@@ -120,7 +117,7 @@ interface ToolCall {
 /**
  * sigw経由で、OpenRouterのモデルを呼ぶ。費用は、callerの人にかかる。
  * 会話には他の人の発言も含まれるので、データを保存・学習しない提供元だけを使う
- * (仕様: docs/spec/llm-cost.md「対応する資格情報」)。
+ * (仕様: docs/spec/llm-cost.md「AIの呼び出しと費用の負担」)。
  * Bobertの道具をAIが呼んだら、実行して結果を返し、続きを頼む。呼び出しが上限に達したら、道具を使わずに答えさせる。
  */
 export async function chatWithOpenRouter(
@@ -381,32 +378,6 @@ function sourcesOf(
 		}
 	}
 	return [...sources.values()];
-}
-
-/** OAuth(PKCE)のcodeを、ユーザー本人のAPIキーと交換する */
-export async function exchangeOpenRouterCode(
-	code: string,
-	codeVerifier: string,
-): Promise<string> {
-	const response = await fetch(`${OPENROUTER_API_BASE}/auth/keys`, {
-		method: "POST",
-		headers: { "Content-Type": "application/json", ...APP_HEADERS },
-		body: JSON.stringify({
-			code,
-			code_verifier: codeVerifier,
-			code_challenge_method: "S256",
-		}),
-	});
-	if (!response.ok) {
-		throw new Error(
-			`OpenRouter key exchange failed with status ${response.status}`,
-		);
-	}
-	const data = (await response.json()) as { key?: string };
-	if (!data.key) {
-		throw new Error("OpenRouter key exchange returned no key");
-	}
-	return data.key;
 }
 
 function toOpenRouterMessage(message: ChatMessage): OpenRouterMessage {

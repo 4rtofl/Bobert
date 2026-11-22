@@ -115,8 +115,8 @@ afterEach(() => {
 	clearModelInfoCache();
 });
 
-/** 資格情報を登録した、新しいユーザー(テストごとに別の人にする) */
-const userWith = userFactory(96_000_000);
+/** 新しいユーザー(テストごとに別の人にする) */
+const newUser = userFactory(96_000_000);
 
 /** 知識チャンネルを指定した日時(テストのメッセージは、これより後に送ったことにする) */
 const DESIGNATED_AT = 1_700_000_000_000;
@@ -693,7 +693,7 @@ describe("文字にして要約する仕事", () => {
 
 	it("PDFを、Workers AIで文字にして保存し、送った人のキー(Claude Haiku 5.5)で要約して、知識に入れる。何も表示しない", async () => {
 		const { guildId, channelId } = await knowledgeGuild();
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const [file] = await pendingFiles(
 			storedMessage(guildId, channelId, [attachment(channelId, "規約.pdf")], {
 				authorId: user.id,
@@ -740,7 +740,7 @@ describe("文字にして要約する仕事", () => {
 
 	it("CSVとテキストは、Workers AIを使わずに読む(Shift_JISのCSVも読める)。OpenRouterだけの人は、OpenRouterで要約する", async () => {
 		const { guildId, channelId } = await knowledgeGuild();
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		const [file] = await pendingFiles(
 			storedMessage(guildId, channelId, [attachment(channelId, "名簿.csv")], {
 				authorId: user.id,
@@ -786,7 +786,7 @@ describe("文字にして要約する仕事", () => {
 
 	it("長いファイルは、先頭の6万文字だけを要約に渡し、そのことを書き添える", async () => {
 		const { guildId, channelId } = await knowledgeGuild();
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const [file] = await pendingFiles(
 			storedMessage(guildId, channelId, [attachment(channelId, "log.txt")], {
 				authorId: user.id,
@@ -817,7 +817,7 @@ describe("文字にして要約する仕事", () => {
 
 	it("要約のモデルを呼べなければ(Bobertにsigwのキーがない)、変換も要約もせず、メッセージごとに1回だけ返信で知らせる", async () => {
 		const { guildId, channelId } = await knowledgeGuild();
-		const user = await userWith();
+		const user = await newUser();
 		const message = storedMessage(
 			guildId,
 			channelId,
@@ -854,7 +854,7 @@ describe("文字にして要約する仕事", () => {
 
 	it("20MBを超えるファイルは、知識に加えず、返信で知らせる", async () => {
 		const { guildId, channelId } = await knowledgeGuild();
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const [file] = await pendingFiles(
 			storedMessage(
 				guildId,
@@ -878,7 +878,7 @@ describe("文字にして要約する仕事", () => {
 
 	it("読めないファイル(壊れている、パスワード付きなど)は、知識に加えず、返信で知らせる。複数のファイルがあれば、ファイル名で書く", async () => {
 		const { guildId, channelId } = await knowledgeGuild();
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const [broken] = await pendingFiles(
 			storedMessage(
 				guildId,
@@ -913,7 +913,7 @@ describe("文字にして要約する仕事", () => {
 
 	it("文字がない(スキャンしただけのPDFなど)ときも、読めないファイルとして知らせる", async () => {
 		const { guildId, channelId } = await knowledgeGuild();
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const [file] = await pendingFiles(
 			storedMessage(guildId, channelId, [attachment(channelId, "scan.pdf")], {
 				authorId: user.id,
@@ -938,7 +938,7 @@ describe("文字にして要約する仕事", () => {
 
 	it("要約できなければ(キーが無効など)、知識に加えず、メンションへの返答のエラーと同じ文で知らせる。文字にした内容は消す", async () => {
 		const { guildId, channelId } = await knowledgeGuild();
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const [file] = await pendingFiles(
 			storedMessage(guildId, channelId, [attachment(channelId, "a.txt")], {
 				authorId: user.id,
@@ -958,7 +958,7 @@ describe("文字にして要約する仕事", () => {
 		await handleKnowledgeJob(job(file as KnowledgeFile), jobEnv().env);
 
 		expect(replies(calls).map((reply) => reply.content)).toEqual([
-			"このファイルは知識に加えませんでした。AnthropicのAPIキーが無効です。`/setup` から登録し直してください。",
+			"このファイルは知識に加えませんでした。いまはAIを呼び出せません。Bobertの管理者に知らせてください。",
 		]);
 		expect(await loadKnowledgeFile(env.DB, file?.id ?? 0)).toMatchObject({
 			state: "rejected",
@@ -972,7 +972,7 @@ describe("文字にして要約する仕事", () => {
 
 	it("メッセージが消されていたら、何も知らせずに、知識のファイルを消す", async () => {
 		const { guildId, channelId } = await knowledgeGuild();
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const message = storedMessage(
 			guildId,
 			channelId,
@@ -1012,7 +1012,7 @@ describe("文字にして要約する仕事", () => {
 
 	it("進み具合を見せていれば、中身を読み取ったら返信を書き換え、知識に入ったら✅を付けて、👀と返信を消す", async () => {
 		const { guildId, channelId } = await knowledgeGuild();
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const message = storedMessage(
 			guildId,
 			channelId,
@@ -1046,7 +1046,7 @@ describe("文字にして要約する仕事", () => {
 
 	it("知識に加えなかったら、今までどおり返信で理由を知らせ、👀と進み具合の返信を消す。✅は付けない", async () => {
 		const { guildId, channelId } = await knowledgeGuild();
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const message = storedMessage(
 			guildId,
 			channelId,
@@ -1078,7 +1078,7 @@ describe("文字にして要約する仕事", () => {
 
 	it("複数のファイルがあれば、すべて終わるまで👀と返信を残し、返信には読み込み中のファイルを並べる。すべて知識に入ったら✅を付ける", async () => {
 		const { guildId, channelId } = await knowledgeGuild();
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const message = storedMessage(
 			guildId,
 			channelId,
@@ -1125,7 +1125,7 @@ describe("文字にして要約する仕事", () => {
 
 	it("複数のファイルのうち、1つでも知識に加えなかったら、✅は付けない", async () => {
 		const { guildId, channelId } = await knowledgeGuild();
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const message = storedMessage(
 			guildId,
 			channelId,
@@ -1165,7 +1165,7 @@ describe("文字にして要約する仕事", () => {
 
 	it("読み込み中に、メッセージが消されたか、知識のファイルが消された(知識チャンネルの解除など)ときも、👀と返信を片付ける", async () => {
 		const { guildId, channelId } = await knowledgeGuild();
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const message = storedMessage(
 			guildId,
 			channelId,
@@ -1577,7 +1577,7 @@ describe("PowerPoint", () => {
 		await processKnowledgeFile(file, deps, 1);
 
 		expect(replied).toEqual([
-			"このファイルは知識に加えませんでした。AnthropicのAPIキーが無効です。`/setup` から登録し直してください。",
+			"このファイルは知識に加えませんでした。いまはAIを呼び出せません。Bobertの管理者に知らせてください。",
 		]);
 		expect(await storedPdf(file.id)).toBeNull();
 	});
@@ -2095,7 +2095,7 @@ describe("返答で知識を使う", () => {
 			{ name: "meeting-notes", description: "議事録を書く手順", body: "本文" },
 			{ id: BOB.id, name: "bob" },
 		);
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, { customPrompt: "敬語で答えて" });
 		const trigger = mention(user, channelId);
 		const calls = mockApis(trigger, () => openRouterChat("月500円です!"));
@@ -2131,7 +2131,7 @@ describe("返答で知識を使う", () => {
 			"部費は月500円です。",
 			"部費の額について。",
 		);
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const trigger = mention(user, channelId);
 		const calls = mockApis(trigger, () =>
 			anthropicStreamOf([{ type: "text", text: "月500円です!" }]),
@@ -2158,7 +2158,7 @@ describe("返答で知識を使う", () => {
 			"部費は月500円です。",
 			"部費の額について。",
 		);
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		const trigger = mention(user, channelId);
 		mockApis(trigger, () => openRouterChat("月500円です!"));
 		const logs = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -2182,7 +2182,7 @@ describe("返答で知識を使う", () => {
 		await pendingFiles(
 			storedMessage(guildId, channelId, [attachment(channelId, "a.pdf")]),
 		);
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		const trigger = mention(user, channelId);
 		const calls = mockApis(trigger, () => openRouterChat("こんにちは!"));
 
@@ -2480,7 +2480,7 @@ describe("/knowledge", () => {
 
 		expect(edits(calls)).toEqual([
 			{
-				content: `<#${channelId}> を知識チャンネルにしました。これから送られたPDF、Word、Excel、PowerPoint、テキストのファイルを、送った人のAIのキーで要約して、AIの知識に加えます。指定する前に送られたファイルは加えません。`,
+				content: `<#${channelId}> を知識チャンネルにしました。これから送られたPDF、Word、Excel、PowerPoint、テキストのファイルを要約して、AIの知識に加えます。要約の費用は、送った人が払います。指定する前に送られたファイルは加えません。`,
 			},
 		]);
 		expect(await getKnowledgeChannel(env.DB, channelId)).toMatchObject({

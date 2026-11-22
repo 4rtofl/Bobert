@@ -34,7 +34,7 @@
 - **シークレット(環境ごと):**
   - DiscordのBotトークン
   - DiscordのPublic Key
-  - キーを暗号化するための鍵
+  - GitHubのトークンを暗号化するための鍵(`CREDENTIAL_ENCRYPTION_KEYS`)
   - 管理用エンドポイントのトークン
   - 障害通知用のWebhook URL
 - **URL:** `workers.dev`のURLで足りる。独自ドメインは不要。
@@ -73,12 +73,6 @@
 4. Anthropic用のsigwのキーには、使えるモデルの制限を付けない。Managed Agentsのセッションを作る呼び出しやイベントの送信には`model`がなく、モデルを制限したキーでは、sigwに断られるため。使いすぎは、キーの上限額で防ぐ。
 5. sigwのキーのワークスペース(Bobert専用のワークスペース)に、エージェントと動画の作成のセッション、ファイル、vaultが作られる。キーの持ち主は、Claude Consoleで、その記録を読める(Bobertを使う3人で受け入れた。2026-11-22)。
 
-### LLM(テスト用)
-
-`/setup`のキーの登録を試すときに、下のキーを使う(AIの呼び出しには、もう使わない。登録の仕組みは#128で見直す)。
-- **Anthropic:** 開発者自身のClaude ConsoleのAPIキー。
-- **OpenRouter:** 開発者自身のアカウントと、少額のクレジット。OAuth連携のテストに使う。アプリの事前登録は不要で、コールバックURLを指定するだけでよい。
-
 ## 手元の開発環境
 
 | ツール                    | 状態(2026-10-23時点)      | 備考                                                                                                     |
@@ -114,4 +108,3 @@
 
 - Discord: [Developer Portal](https://discord.com/developers/applications) / [Receiving and Responding(Interactions)](https://docs.discord.com/developers/interactions/receiving-and-responding)
 - Cloudflare: [Local development](https://developers.cloudflare.com/workers/local-development/) / [Workersの料金](https://developers.cloudflare.com/workers/platform/pricing/)
-- OpenRouter: [OAuth PKCE](https://openrouter.ai/docs/guides/overview/auth/oauth)

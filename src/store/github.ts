@@ -1,7 +1,7 @@
 import { decryptSecret, encryptSecret } from "../crypto";
 
 /**
- * GitHubとの連携の記録(D1)。仕様: docs/spec/llm-cost.md「資格情報の登録・保存・削除」
+ * GitHubとの連携の記録(D1)。仕様: docs/spec/llm-cost.md「GitHubのトークンの保存と削除」
  * - github_links: 本人のトークン(APIキーと同じ鍵で暗号化する)
  * - github_link_states: 連携のリンクの途中の状態
  */
@@ -269,7 +269,7 @@ function encryptTokens(env: Env, userId: string, tokens: GitHubTokens) {
 	);
 }
 
-/** 暗号文に結び付ける持ち主。ほかの人の行や、APIキーの行に移しても復号できないようにする */
+/** 暗号文に結び付ける持ち主。ほかの人の行に移しても復号できないようにする */
 function secretOwner(userId: string): string {
 	return `${userId}:github`;
 }

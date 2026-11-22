@@ -437,7 +437,7 @@ describe("セッションのイベント", () => {
 		await relay.handle(idle("retries_exhausted"));
 
 		expect(posts.at(-1)?.content).toBe(
-			"エラーで作業が止まりました。Anthropicの残高が不足しています。Claude Consoleでクレジットを追加してください。",
+			"エラーで作業が止まりました。いまはAIを呼び出せません。Bobertの管理者に知らせてください。",
 		);
 	});
 

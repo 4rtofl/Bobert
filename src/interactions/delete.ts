@@ -60,7 +60,7 @@ export async function deleteCommand(
 		type: InteractionResponseType.ChannelMessageWithSource,
 		data: {
 			flags: MessageFlags.Ephemeral,
-			content: `登録したAPIキー(Anthropic、OpenRouter)と設定を、すべて削除します。${memory}${agents}${video}${github}よろしいですか?`,
+			content: `あなたの設定(モデルや自分用の指示など)を、すべて削除します。${memory}${agents}${video}${github}よろしいですか?`,
 			components: [
 				{
 					type: ComponentType.ActionRow,
@@ -79,7 +79,7 @@ export async function deleteCommand(
 }
 
 /**
- * 確認のボタン: キーと設定と記憶を消す(仕様: docs/spec/llm-cost.md「資格情報の登録・保存・削除」)。
+ * 確認のボタン: 設定と記憶を消す(仕様: docs/spec/behavior.md「スラッシュコマンド」の/delete)。
  * エージェントと動画のセッションは、記録を消してから、裏でsigw経由で消す(sigwが、消す直前までの費用を本人に付ける)。
  * GitHubとの連携も同じく、トークンを読んでおき、記録を消してから、裏でGitHubの側の承認を取り消す
  */
@@ -114,8 +114,7 @@ export async function confirmDelete(
 	return {
 		type: InteractionResponseType.UpdateMessage,
 		data: {
-			content:
-				"削除しました。OpenRouterで発行されたキーは、OpenRouterのサイトでも削除できます。また使うときは `/setup` から登録してください。",
+			content: "削除しました。",
 			components: [],
 		},
 	};
@@ -123,7 +122,7 @@ export async function confirmDelete(
 
 /**
  * 本人のエージェントのセッションとチャンネルを消し、本人のために作った環境と、秘密を預けたvaultを消して、エージェントの設定をアーカイブする。
- * 失敗しても、キーと設定はもう消してあるので、記録を残すだけにする
+ * 失敗しても、設定はもう消してあるので、記録を残すだけにする
  */
 async function removeAgents(
 	env: Env,
@@ -166,7 +165,7 @@ async function removeAgents(
 
 /**
  * 作っている途中の動画のセッションを消し、本人のために作った動画用の環境を消して、エージェントの設定をアーカイブする。
- * 失敗しても、キーと設定はもう消してあるので、記録を残すだけにする
+ * 失敗しても、設定はもう消してあるので、記録を残すだけにする
  */
 async function removeVideo(
 	env: Env,

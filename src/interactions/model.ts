@@ -190,7 +190,7 @@ function customModelModal(previousId: string | null): APIInteractionResponse {
 					type: ComponentType.Label,
 					label: "モデルID",
 					description:
-						"Claudeはclaude-で始まるID(Anthropicのキーで呼ぶ)、それ以外はOpenRouterのID",
+						"Claudeはclaude-で始まるID(Anthropicで直接呼ぶ)、それ以外はOpenRouterのID",
 					component: {
 						type: ComponentType.TextInput,
 						custom_id: MODEL_ID_INPUT_ID,

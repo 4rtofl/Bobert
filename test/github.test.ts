@@ -132,7 +132,7 @@ function installationsApi(
 
 describe("GitHubとの連携のリンク", () => {
 	it("「GitHubと連携」を押すと、承認の画面へのリンクを、本人にだけ見せる", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await insertAgentChannel(env.DB, {
 			channelId: "63101",
 			guildId: "900",
@@ -171,7 +171,7 @@ describe("GitHubとの連携のリンク", () => {
 	});
 
 	it("/agent の返事に付けたボタン(エージェントのチャンネルの外)を押しても、連携のリンクを見せる", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 
 		const response = await sendInteraction({
 			...guildInteraction(
@@ -195,7 +195,7 @@ describe("GitHubとの連携のリンク", () => {
 	});
 
 	it("戻ってきたcodeをトークンと交換して暗号化して保存し、「GitHubと連携」への返事を書き換える", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const link = await createLink(owner.id);
 		const state = link.searchParams.get("state") ?? "";
 		const calls = mockFetch((call) => {
@@ -254,7 +254,7 @@ describe("GitHubとの連携のリンク", () => {
 	});
 
 	it("/agent の返事の「GitHubと連携」から連携できたら、同じメッセージを、リポジトリを選ぶセレクトメニューに書き換える", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const link = new URL(
 			await createGitHubAuthLink(env, ORIGIN, owner.id, BUTTON_TOKEN, "agent"),
 		);
@@ -287,7 +287,7 @@ describe("GitHubとの連携のリンク", () => {
 	});
 
 	it("承認したが、まだアプリを入れていなければ、アプリを入れる画面へ進め、戻ってきたら保存する", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const link = await createLink(owner.id);
 		const state = link.searchParams.get("state") ?? "";
 		let installed = false;
@@ -337,7 +337,7 @@ describe("GitHubとの連携のリンク", () => {
 	});
 
 	it("アプリを入れる画面からも、入れずに戻ってきたら、保存しない", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const now = Date.now();
 		await saveGitHubLinkState(env.DB, "install-state", {
 			userId: owner.id,
@@ -368,7 +368,7 @@ describe("GitHubとの連携のリンク", () => {
 	});
 
 	it("有効期限が切れたリンクは使えない", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const now = Date.now();
 		await saveGitHubLinkState(
 			env.DB,
@@ -394,7 +394,7 @@ describe("GitHubとの連携のリンク", () => {
 	});
 
 	it("トークンと交換できなければ、エラーのページを出し、保存しない", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const state = (await createLink(owner.id)).searchParams.get("state") ?? "";
 		mockFetch(() =>
 			Response.json({
@@ -413,7 +413,7 @@ describe("GitHubとの連携のリンク", () => {
 
 describe("GitHubのトークン", () => {
 	it("期限が近ければ、更新用のトークンで更新して、入れ替える", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await saveGitHubLink(env, owner.id, {
 			accessToken: "ghu_old",
 			refreshToken: "ghr_old",
@@ -436,7 +436,7 @@ describe("GitHubのトークン", () => {
 	});
 
 	it("期限まで余裕があれば、更新しない", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await saveGitHubLink(env, owner.id, freshTokens());
 		const calls = mockFetch(() => issuedTokens("ghu_new", "ghr_new"));
 
@@ -447,7 +447,7 @@ describe("GitHubのトークン", () => {
 	});
 
 	it("更新用のトークンが使えなければ(GitHubで外された)、連携を消す", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await saveGitHubLink(env, owner.id, {
 			accessToken: "ghu_old",
 			refreshToken: "ghr_revoked",
@@ -461,7 +461,7 @@ describe("GitHubのトークン", () => {
 	});
 
 	it("更新に失敗しても、ほかの処理が先に更新していれば、そのトークンを使う", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await saveGitHubLink(env, owner.id, {
 			accessToken: "ghu_old",
 			refreshToken: "ghr_used",
@@ -485,7 +485,7 @@ describe("GitHubのトークン", () => {
 
 describe("許可されたリポジトリ", () => {
 	it("本人が許可したリポジトリを、名前で探す(大文字と小文字は区別しない)", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await saveGitHubLink(env, owner.id, freshTokens());
 		const calls = mockFetch(
 			(call) =>
@@ -520,7 +520,7 @@ describe("許可されたリポジトリ", () => {
 	});
 
 	it("トークンが断られたら(401)、更新してもう一度試す", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await saveGitHubLink(env, owner.id, freshTokens("ghu_rejected"));
 		mockFetch((call) => {
 			if (call.url.hostname === "github.com") {
@@ -546,7 +546,7 @@ describe("許可されたリポジトリ", () => {
 	});
 
 	it("承認が取り消されていたら(401のあと更新もできない)、連携を消す", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await saveGitHubLink(env, owner.id, freshTokens());
 		mockFetch((call) =>
 			call.url.hostname === "github.com"
@@ -566,7 +566,7 @@ describe("許可されたリポジトリ", () => {
 	});
 
 	it("アプリがどこにも入っていなければ(GitHubで外された)、連携を消す", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await saveGitHubLink(env, owner.id, freshTokens());
 		mockFetch(() => Response.json({ total_count: 0, installations: [] }));
 
@@ -582,7 +582,7 @@ describe("許可されたリポジトリ", () => {
 	});
 
 	it("連携していなければ、GitHubを呼ばない", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const calls = mockFetch(() => Response.json({}));
 
 		expect(
@@ -594,7 +594,7 @@ describe("許可されたリポジトリ", () => {
 
 describe("PRを作る", () => {
 	it("本人のトークンでPRを作り、URLを返す", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await saveGitHubLink(env, owner.id, freshTokens());
 		const calls = mockFetch(() =>
 			Response.json(
@@ -628,7 +628,7 @@ describe("PRを作る", () => {
 	});
 
 	it("GitHubに断られたら、その理由を返す", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await saveGitHubLink(env, owner.id, freshTokens());
 		mockFetch(() =>
 			Response.json(
@@ -671,7 +671,7 @@ describe("GitHubへの書き込み", () => {
 	};
 
 	it("本人のトークンで書き込み、結果のURLを返す", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await saveGitHubLink(env, owner.id, freshTokens());
 		const calls = mockFetch(() =>
 			Response.json({ html_url: "https://github.com/octocat/hello/pull/3" }),
@@ -691,7 +691,7 @@ describe("GitHubへの書き込み", () => {
 	});
 
 	it("GitHubに断られたら、その理由を返す", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await saveGitHubLink(env, owner.id, freshTokens());
 		mockFetch(() =>
 			Response.json({ message: "Resource not accessible" }, { status: 403 }),
@@ -704,7 +704,7 @@ describe("GitHubへの書き込み", () => {
 	});
 
 	it("連携していなければ、連携していないと返す", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		mockFetch(() => Response.json({}));
 
 		expect(await writeToGitHub(env, owner.id, request)).toEqual({
@@ -715,7 +715,7 @@ describe("GitHubへの書き込み", () => {
 
 describe("/delete とGitHub", () => {
 	it("確認で、GitHubとの連携も外すことを書き、消したらGitHubの側の承認も取り消す", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await saveGitHubLink(env, owner.id, freshTokens());
 		const command = await sendInteraction(
 			guildInteraction(
@@ -725,7 +725,7 @@ describe("/delete とGitHub", () => {
 			),
 		);
 		expect(command.data.content).toBe(
-			`登録したAPIキー(Anthropic、OpenRouter)と設定を、すべて削除します。${DELETE_GITHUB_NOTE}よろしいですか?`,
+			`あなたの設定(モデルや自分用の指示など)を、すべて削除します。${DELETE_GITHUB_NOTE}よろしいですか?`,
 		);
 		const calls = mockFetch(() => new Response(null, { status: 204 }));
 
@@ -749,7 +749,7 @@ describe("/delete とGitHub", () => {
 	});
 
 	it("連携していなければ、確認にGitHubのことを書かない", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 
 		const command = await sendInteraction(
 			guildInteraction(

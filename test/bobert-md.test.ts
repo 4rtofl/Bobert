@@ -21,7 +21,7 @@ import {
 } from "../src/respond/prompt";
 import { getBobertMd, saveBobertMd } from "../src/store/bobert-md";
 import { addSkill } from "../src/store/skills";
-import { saveCredential, updateUserSettings } from "../src/store/users";
+import { updateUserSettings } from "../src/store/users";
 import { ALICE, BOB, BOT, CHANNEL_ID, discordMessage } from "./fixtures";
 import {
 	anthropicStreamOf,
@@ -393,13 +393,8 @@ describe("返答でBobert.mdを使う", () => {
 		return String(nextMessageId++);
 	}
 
-	async function userWith(provider: "anthropic" | "openrouter") {
-		const user = { ...ALICE, id: newMessageId() };
-		await saveCredential(env, user.id, provider, {
-			apiKey: `key-${provider}`,
-			workspaceId: null,
-		});
-		return user;
+	function newUser() {
+		return { ...ALICE, id: newMessageId() };
 	}
 
 	function mention(user: typeof ALICE, text: string): APIMessage {
@@ -484,7 +479,7 @@ describe("返答でBobert.mdを使う", () => {
 			},
 			BOB_EDITOR,
 		);
-		const user = await userWith("openrouter");
+		const user = newUser();
 		await updateUserSettings(env.DB, user.id, { customPrompt: "敬語で答えて" });
 		const trigger = mention(user, "こんにちは");
 		const calls = mockApis(trigger, () => openRouterChat("こんにちは!"));
@@ -508,7 +503,7 @@ describe("返答でBobert.mdを使う", () => {
 	it("Anthropicで呼ぶときも、共通の指示の次のブロックにする", async () => {
 		const guildId = newGuild();
 		await seed(guildId);
-		const user = await userWith("anthropic");
+		const user = newUser();
 		const trigger = mention(user, "こんにちは");
 		const calls = mockApis(trigger, () =>
 			anthropicStreamOf([{ type: "text", text: "こんにちは!" }]),
@@ -528,7 +523,7 @@ describe("返答でBobert.mdを使う", () => {
 	it("道具を使えないモデルにも渡す", async () => {
 		const guildId = newGuild();
 		await seed(guildId);
-		const user = await userWith("openrouter");
+		const user = newUser();
 		await updateUserSettings(env.DB, user.id, {
 			modelKey: "custom",
 			customModelId: "x-ai/old-model",
@@ -562,7 +557,7 @@ describe("返答でBobert.mdを使う", () => {
 		await seed(newGuild());
 
 		for (const guildId of [cleared, newGuild()]) {
-			const user = await userWith("openrouter");
+			const user = newUser();
 			const trigger = mention(user, "こんにちは");
 			const calls = mockApis(trigger, () => openRouterChat("こんにちは!"));
 

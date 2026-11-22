@@ -81,11 +81,6 @@ const MESSAGE_MENU = {
 export const COMMANDS: RESTPutAPIApplicationCommandsJSONBody = [
 	{
 		...GUILD_ONLY,
-		name: "setup",
-		description: "Anthropic APIキーの登録・OpenRouterへのログイン",
-	},
-	{
-		...GUILD_ONLY,
 		name: "model",
 		description: "使うモデルの変更",
 	},
@@ -233,7 +228,7 @@ export const COMMANDS: RESTPutAPIApplicationCommandsJSONBody = [
 	{
 		...GUILD_ONLY,
 		name: "delete",
-		description: "登録したキーと設定の削除",
+		description: "自分の設定と記録の削除",
 	},
 	{
 		...GUILD_ONLY,

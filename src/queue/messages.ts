@@ -28,7 +28,7 @@ export interface RespondJob {
 	messageId: string;
 	channelId: string;
 	guildId: string | null;
-	/** 話しかけた人。この人の資格情報と設定を使う */
+	/** 話しかけた人。この人の設定を使い、AIの費用もこの人が払う */
 	authorId: string;
 	/**
 	 * 話しかけたメッセージで分かった、サーバーで見えている名前(発言者と、メンションされた人)。
@@ -47,7 +47,7 @@ export interface ExplainJob {
 	interactionId: string;
 	/** Interactionのトークン。保留にした応答を書き換えるのに使う(15分で切れる) */
 	interactionToken: string;
-	/** 選んだ人。この人の資格情報と設定を使う */
+	/** 選んだ人。この人の設定を使い、AIの費用もこの人が払う */
 	userId: string;
 	/** 選んだ人の、サーバーで見えている名前 */
 	userName: string;
@@ -97,7 +97,7 @@ export interface CompactJob {
 	kind: "compact";
 	/** Interactionのトークン。保留にした応答を書き換えるのに使う(15分で切れる) */
 	interactionToken: string;
-	/** 押した人(選んだ人)。この人の資格情報と設定を使う */
+	/** 押した人(選んだ人)。この人の設定を使い、AIの費用もこの人が払う */
 	userId: string;
 	channelId: string;
 	guildId: string | null;

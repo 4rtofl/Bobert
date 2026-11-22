@@ -28,8 +28,8 @@ afterEach(() => {
 	clearModelInfoCache();
 });
 
-/** 資格情報を登録した、新しいユーザー(テストごとに別の人にする) */
-const userWith = userFactory(300);
+/** 新しいユーザー(テストごとに別の人にする) */
+const newUser = userFactory(300);
 
 function modelCommand(user: APIUser) {
 	return guildInteraction(
@@ -78,7 +78,7 @@ function submitModelId(user: APIUser, modelId: string) {
 describe("/model", () => {
 	it("Bobertにsigwのキーがなければ、メニューの代わりに、AIを呼び出せないことを伝える", async () => {
 		const body = await sendInteraction(
-			modelCommand(await userWith()),
+			modelCommand(await newUser()),
 			noSigwEnv(),
 		);
 
@@ -89,7 +89,7 @@ describe("/model", () => {
 	});
 
 	it("キーを登録していなくても、sigwに両方のキーがあれば、候補の20個と「その他」を、今のモデルを選んだ状態で出す", async () => {
-		const body = await sendInteraction(modelCommand(await userWith()));
+		const body = await sendInteraction(modelCommand(await newUser()));
 
 		expect(body.data.flags).toBe(MessageFlags.Ephemeral);
 		expect(body.data.content).toBe("使うモデルを選んでください。");
@@ -118,7 +118,7 @@ describe("/model", () => {
 
 	it("sigwのキーがAnthropicの分だけなら、Claudeの4つと「その他」だけを出す", async () => {
 		const body = await sendInteraction(
-			modelCommand(await userWith()),
+			modelCommand(await newUser()),
 			anthropicOnlyEnv(),
 		);
 
@@ -135,7 +135,7 @@ describe("/model", () => {
 	});
 
 	it("「その他」のモデルを使っていれば、どの選択肢も選んでいない状態で出す", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, {
 			modelKey: "custom",
 			customModelId: "openai/gpt-6.1-sol",
@@ -161,7 +161,7 @@ describe("/model", () => {
 	});
 
 	it("メニューで選んだモデルを保存し、メニューのメッセージを結果に書き換える", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		const calls = mockModelApis([]);
 
 		const body = await sendInteraction(select(user, "gpt-6-luna"));
@@ -184,7 +184,7 @@ describe("/model", () => {
 	});
 
 	it("sigwのキーで呼べないモデルなら保存せず、いまは使えないことを伝える", async () => {
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const calls = mockModelApis([]);
 
 		await sendInteraction(select(user, "gpt-6-luna"), anthropicOnlyEnv());
@@ -196,7 +196,7 @@ describe("/model", () => {
 	});
 
 	it("保存した思考の深さを新しいモデルで選べなければ、既定に戻す", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, { effort: "medium" });
 		const calls = mockModelApis([
 			{
@@ -217,7 +217,7 @@ describe("/model", () => {
 	});
 
 	it("保存した思考の深さを新しいモデルでも選べるなら、そのまま残す", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, { effort: "high" });
 		const calls = mockModelApis([
 			{
@@ -236,7 +236,7 @@ describe("/model", () => {
 	});
 
 	it("Claudeは low〜max を選べるので、Anthropicで直接呼ぶならモデル情報を取得せずに確かめる", async () => {
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, { effort: "xhigh" });
 		const calls = mockModelApis([]);
 
@@ -251,7 +251,7 @@ describe("/model", () => {
 	});
 
 	it("「その他」を選ぶと、前に入力したIDを入れたモーダルを開く", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, {
 			modelKey: "gpt-6-luna",
 			customModelId: "x-ai/grok-4.7-mini",
@@ -271,7 +271,7 @@ describe("/model", () => {
 
 describe("/model の「その他」", () => {
 	it("OpenRouterのモデル一覧にあれば保存し、メニューのメッセージを結果に書き換える", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		const calls = mockModelApis([
 			{ id: "openai/gpt-6.1-sol", inputModalities: ["text", "image"] },
 		]);
@@ -300,7 +300,7 @@ describe("/model の「その他」", () => {
 	});
 
 	it("OpenRouterのモデル一覧になければ保存せず、そう知らせる", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		const calls = mockModelApis([
 			{ id: "openai/gpt-6.1-sol", inputModalities: ["text"] },
 		]);
@@ -314,7 +314,7 @@ describe("/model の「その他」", () => {
 	});
 
 	it("OpenRouterのモデル一覧を取得できなければ、確かめられなかったと知らせる", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		const calls = mockFetch(({ url }) =>
 			url.hostname === "openrouter.ai"
 				? new Response(null, { status: 503 })
@@ -328,7 +328,7 @@ describe("/model の「その他」", () => {
 	});
 
 	it("OpenRouterのモデル一覧は、取得したらしばらく使い回す", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		const calls = mockModelApis([
 			{ id: "openai/gpt-6.1-sol", inputModalities: ["text"] },
 			{ id: "x-ai/grok-4.7-mini", inputModalities: ["text"] },
@@ -346,7 +346,7 @@ describe("/model の「その他」", () => {
 	});
 
 	it("claude-で始まるIDは、sigw経由でAnthropicに確かめる", async () => {
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const calls = mockModelApis([], () =>
 			Response.json({
 				type: "model",
@@ -377,7 +377,7 @@ describe("/model の「その他」", () => {
 	});
 
 	it("Anthropicで見つからなければ保存せず、そう知らせる", async () => {
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		const calls = mockModelApis([], () =>
 			Response.json(
 				{
@@ -395,7 +395,7 @@ describe("/model の「その他」", () => {
 	});
 
 	it("claude-で始まるIDでも、sigwにAnthropicのキーがなければ、確かめずに、いまは使えないことを伝える", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		const calls = mockModelApis([]);
 
 		await sendInteraction(
@@ -412,7 +412,7 @@ describe("/model の「その他」", () => {
 	});
 
 	it("保存した思考の深さをそのモデルで選べなければ、既定に戻す", async () => {
-		const user = await userWith("openrouter");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, { effort: "xhigh" });
 		const calls = mockModelApis([
 			{ id: "z-ai/glm-5.3", efforts: ["max", "high", "low"] },
@@ -429,7 +429,7 @@ describe("/model の「その他」", () => {
 	});
 
 	it("Claudeで選べる段階は、Anthropicのモデル情報から確かめる", async () => {
-		const user = await userWith("anthropic");
+		const user = await newUser();
 		await updateUserSettings(env.DB, user.id, { effort: "high" });
 		const calls = mockModelApis([], () =>
 			Response.json({

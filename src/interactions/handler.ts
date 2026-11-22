@@ -74,12 +74,6 @@ import {
 import { PROMPT_MODAL_ID, promptCommand, submitPrompt } from "./prompt";
 import { settingsCommand } from "./settings";
 import {
-	anthropicKeyModal,
-	SETUP_ANTHROPIC_ID,
-	setupCommand,
-	submitAnthropicKey,
-} from "./setup";
-import {
 	SKILLS_COMMAND_NAME,
 	SKILLS_ID_PREFIX,
 	skillComponent,
@@ -106,7 +100,7 @@ export async function handleInteraction(
 	if (interaction.type === InteractionType.Ping) {
 		return Response.json({ type: InteractionResponseType.Pong });
 	}
-	// OpenRouterとGitHubのOAuthのコールバック先に、このWorkerのURLを使う
+	// GitHubのOAuthのコールバック先に、このWorkerのURLを使う
 	const origin = new URL(request.url).origin;
 	return Response.json(await route(interaction, env, ctx, origin));
 }
@@ -189,9 +183,6 @@ async function route(
 			}
 			if (interaction.data.name === ENDAGENT_COMMAND_NAME) {
 				return endagentCommand(env, channelIdOf(interaction), user.id);
-			}
-			if (interaction.data.name === "setup") {
-				return setupCommand(env, origin, user, interaction.token);
 			}
 			if (interaction.data.name === "model") {
 				return modelCommand(env, user.id);
@@ -288,9 +279,6 @@ async function route(
 			if (interaction.data.custom_id === COMPACT_BUTTON_ID) {
 				return compactFromButton(interaction, env, user.id);
 			}
-			if (interaction.data.custom_id === SETUP_ANTHROPIC_ID) {
-				return anthropicKeyModal();
-			}
 			if (interaction.data.custom_id.startsWith(FEAT_BUTTON_PREFIX)) {
 				const toggled = await toggleFeature(
 					env,
@@ -378,9 +366,6 @@ async function route(
 			break;
 		}
 		case InteractionType.ModalSubmit:
-			if (interaction.data.custom_id === SETUP_ANTHROPIC_ID) {
-				return submitAnthropicKey(interaction, env, ctx, user.id);
-			}
 			if (interaction.data.custom_id === MODEL_CUSTOM_ID) {
 				return submitCustomModel(interaction, env, ctx, user.id);
 			}

@@ -35,7 +35,7 @@ const AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
 const LINK_TTL_MS = 10 * 60_000;
 
 /**
- * 「GitHubと連携」のボタンで見せる、連携のリンクを作る(仕様: docs/spec/llm-cost.md「資格情報の登録・保存・削除」)。
+ * 「GitHubと連携」のボタンで見せる、連携のリンクを作る(仕様: docs/spec/architecture.md「エージェント(Bobert Agent)」の「GitHub」)。
  * リンクの先は、承認の画面。まだアプリを入れていない人は、承認の後に、アプリを入れる画面(触らせるリポジトリを選ぶ画面)へ進める。
  * 先にアプリを入れる画面へ送らないのは、すでにアプリを入れている人が、その画面からBobertに戻ってこないため
  * (アプリの設定を変えても、GitHubはコールバックへ戻さない)。

@@ -14,7 +14,7 @@ import {
 } from "../src/respond/summary";
 import { saveMessages } from "../src/store/messages";
 import { recordReplyUsage, saveSummary } from "../src/store/summaries";
-import { DEFAULT_USER_SETTINGS, saveCredential } from "../src/store/users";
+import { DEFAULT_USER_SETTINGS } from "../src/store/users";
 import {
 	ALICE,
 	at,
@@ -70,14 +70,9 @@ function conversation(
 	return messages;
 }
 
-/** Anthropicのキーを登録した人(既定のClaude Haiku 5.5をAnthropicで直接呼ぶ) */
-async function anthropicUser(id: string) {
-	const user = { ...ALICE, id };
-	await saveCredential(env, user.id, "anthropic", {
-		apiKey: "sk-ant-test",
-		workspaceId: null,
-	});
-	return user;
+/** 話しかける人(既定のClaude Haiku 5.5を、sigwを通してAnthropicで直接呼ぶ) */
+function userOf(id: string) {
+	return { ...ALICE, id };
 }
 
 /**
@@ -160,7 +155,7 @@ function texts(request: {
 
 describe("長い会話の自動要約", () => {
 	it("会話が入力の上限の8割を超えたら、新しい20件を残して、それより前を要約し、保存する", async () => {
-		const user = await anthropicUser("150");
+		const user = userOf("150");
 		const stored = conversation(user, 7000, 25);
 		await saveMessages(
 			env.DB,
@@ -214,7 +209,7 @@ describe("長い会話の自動要約", () => {
 	});
 
 	it("保存した要約があれば、要約した位置より前は読まず、要約と、それより後の発言を渡す", async () => {
-		const user = await anthropicUser("151");
+		const user = userOf("151");
 		const stored = conversation(user, 7100, 10);
 		await saveMessages(
 			env.DB,
@@ -253,7 +248,7 @@ describe("長い会話の自動要約", () => {
 	});
 
 	it("8割を超えていなければ要約せず、返答のときの入力のトークン数を記録する", async () => {
-		const user = await anthropicUser("152");
+		const user = userOf("152");
 		const stored = conversation(user, 7200, 25);
 		await saveMessages(
 			env.DB,

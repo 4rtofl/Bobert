@@ -294,7 +294,7 @@ async function seedChannel(
 
 describe("/agent", () => {
 	it("BobertにAnthropicのsigwのキーがなければ、AIを呼び出せないと知らせる", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const calls = mockAgentApis();
 
 		await sendInteraction(agentCommand(user), openRouterOnlyEnv());
@@ -303,7 +303,7 @@ describe("/agent", () => {
 	});
 
 	it("Bobertに「チャンネルの管理」の権限がなければ、チャンネルを作らずに知らせる", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const calls = mockAgentApis();
 
 		await sendInteraction(agentCommand(user, "0"));
@@ -315,7 +315,7 @@ describe("/agent", () => {
 	});
 
 	it("終えていないセッションが3つあれば、そのチャンネルを挙げて知らせる", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		for (const channelId of ["61101", "61102", "61103"]) {
 			await seedChannel(channelId, user.id);
 		}
@@ -464,7 +464,7 @@ describe("/agent", () => {
 	});
 
 	it("サーバーにスキルがあれば、指示にスキルの一覧を足し、スキルを読む道具を渡す", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const guildId = "61950";
 		await addSkill(
 			env.DB,
@@ -499,7 +499,7 @@ describe("/agent", () => {
 	});
 
 	it("埋め込みリンクの権限がなければ、同じ内容を普通の文で書く", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const calls = mockAgentApis();
 
 		await startWithoutRepository(user, String(PermissionFlags.ManageChannels));
@@ -525,7 +525,7 @@ describe("/agent", () => {
 	});
 
 	it("連携している人には、最近pushした順にリポジトリを並べたセレクトメニューを出し、選んだリポジトリを、セッションを作るときにつなぐ", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		await linkGitHub(user.id);
 		const calls = mockAgentApis((call) => {
 			if (
@@ -610,7 +610,7 @@ describe("/agent", () => {
 	});
 
 	it("セレクトメニューで「リポジトリを使わない」を選ぶと、リポジトリをつながずに始める", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		await linkGitHub(user.id);
 		const calls = mockAgentApis(allowedRepositoriesApi);
 
@@ -628,7 +628,7 @@ describe("/agent", () => {
 	});
 
 	it("連携していない人には、セレクトメニューの前に、連携のボタンと「リポジトリを使わずに始める」を出す", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const calls = mockAgentApis();
 
 		await sendInteraction(agentCommand(user));
@@ -664,7 +664,7 @@ describe("/agent", () => {
 	});
 
 	it("/agent の返事の「GitHubと連携」を押すと、同じメッセージを、GitHubへのリンクと「リポジトリを使わずに始める」に書き換える", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		mockAgentApis();
 
 		const response = await sendInteraction(
@@ -693,7 +693,7 @@ describe("/agent", () => {
 	});
 
 	it("選ぶ間にリポジトリが使えなくなっていたら、使えないと知らせ、セッションを作らない", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		await linkGitHub(user.id);
 		const calls = mockAgentApis(allowedRepositoriesApi);
 
@@ -733,7 +733,7 @@ describe("/agent", () => {
 	});
 
 	it("キーが無効でセッションを始められなければ、理由を添えて知らせ、チャンネルは作らない", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const calls = mockAgentApis((call) =>
 			call.url.hostname === "api.anthropic.com"
 				? Response.json(
@@ -749,7 +749,7 @@ describe("/agent", () => {
 		await startWithoutRepository(user);
 
 		expect(editedBodies(calls).at(-1)?.content).toBe(
-			"エージェントのセッションを始められませんでした。AnthropicのAPIキーが無効です。`/setup` から登録し直してください。",
+			"エージェントのセッションを始められませんでした。いまはAIを呼び出せません。Bobertの管理者に知らせてください。",
 		);
 		expect(calls.some((call) => call.url.pathname.endsWith("/channels"))).toBe(
 			false,
@@ -757,7 +757,7 @@ describe("/agent", () => {
 	});
 
 	it("チャンネルを作る権限がなかったら、始めたセッションを消して知らせる", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 		const calls = mockAgentApis((call) =>
 			call.url.pathname.endsWith(`/guilds/${GUILD_ID}/channels`)
 				? Response.json(
@@ -796,7 +796,7 @@ describe("/endagent", () => {
 	}
 
 	it("エージェントのチャンネルの外では、中で使うよう知らせる", async () => {
-		const user = await newUser("anthropic");
+		const user = await newUser();
 
 		const response = await sendInteraction(endagent(user, "61200"));
 
@@ -805,8 +805,8 @@ describe("/endagent", () => {
 	});
 
 	it("本人以外は終えられない", async () => {
-		const owner = await newUser("anthropic");
-		const other = await newUser("anthropic");
+		const owner = await newUser();
+		const other = await newUser();
 		await seedChannel("61201", owner.id);
 
 		const response = await sendInteraction(endagent(other, "61201"));
@@ -815,7 +815,7 @@ describe("/endagent", () => {
 	});
 
 	it("終えたあとは、もう終わっていると知らせる", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await seedChannel("61202", owner.id, null);
 
 		const response = await sendInteraction(endagent(owner, "61202"));
@@ -824,7 +824,7 @@ describe("/endagent", () => {
 	});
 
 	it("本人には、終える確認を出す", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await seedChannel("61203", owner.id);
 
 		const response = await sendInteraction(endagent(owner, "61203"));
@@ -854,8 +854,8 @@ describe("エージェントのボタン", () => {
 	}
 
 	it("本人以外が押したら、押した人にだけ知らせる", async () => {
-		const owner = await newUser("anthropic");
-		const other = await newUser("anthropic");
+		const owner = await newUser();
+		const other = await newUser();
 		await seedChannel("61301", owner.id);
 
 		const response = await sendInteraction(
@@ -867,7 +867,7 @@ describe("エージェントのボタン", () => {
 	});
 
 	it("「セッションを終える」で、確認を出す", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await seedChannel("61302", owner.id);
 
 		const response = await sendInteraction(button(owner, "61302", "agent:end"));
@@ -876,7 +876,7 @@ describe("エージェントのボタン", () => {
 	});
 
 	it("終える確認のボタンで、セッションを消し、チャンネルは残して、削除ボタン付きで知らせる", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const channelId = "61304";
 		await seedChannel(channelId, owner.id);
 		await agentSessionStub(env, channelId).setup({
@@ -915,7 +915,7 @@ describe("エージェントのボタン", () => {
 	});
 
 	it("「チャンネルを削除」で、削除の確認を出す", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await seedChannel("61303", owner.id, null);
 
 		const response = await sendInteraction(
@@ -932,7 +932,7 @@ describe("エージェントのボタン", () => {
 
 describe("ほかの機能との関係", () => {
 	it("エージェントのチャンネルでは、「会話を要約」を使えない", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await seedChannel("61401", owner.id);
 		const target = discordMessage("61499", owner, "要約して", {
 			channel_id: "61401",
@@ -960,7 +960,7 @@ describe("ほかの機能との関係", () => {
 	});
 
 	it("/delete の確認で、エージェントのチャンネルとセッションも消すことを書く", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		await seedChannel("61402", owner.id);
 
 		const response = await sendInteraction(
@@ -972,12 +972,12 @@ describe("ほかの機能との関係", () => {
 		);
 
 		expect(response.data.content).toBe(
-			`登録したAPIキー(Anthropic、OpenRouter)と設定を、すべて削除します。${DELETE_AGENTS_NOTE}よろしいですか?`,
+			`あなたの設定(モデルや自分用の指示など)を、すべて削除します。${DELETE_AGENTS_NOTE}よろしいですか?`,
 		);
 	});
 
 	it("エージェントのチャンネルは、共有の印があっても、保存の対象にも、チャンネルの一覧にも入れない", async () => {
-		const owner = await newUser("anthropic");
+		const owner = await newUser();
 		const guildId = "61900";
 		const roles = testGuildRoles(guildId);
 		await replaceGuildRoles(env.DB, guildId, roles.roles, 1);
